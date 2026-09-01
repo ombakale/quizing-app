@@ -2,8 +2,9 @@ package com.quizapp.controller;
 
 import com.quizapp.dto.QuizResultResponse;
 import com.quizapp.dto.QuizSubmitRequest;
-import com.quizapp.dto.QuizSummaryResponse;
-import com.quizapp.entity.QuizAttempt;
+import com.quizapp.dto.response.QuizAttemptResponse;
+import com.quizapp.dto.response.QuizSummaryResponse;
+import com.quizapp.dto.response.StudentQuizResponse;
 import com.quizapp.service.QuizService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -19,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/quizzes")
@@ -41,7 +41,7 @@ public class QuizController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get quiz questions for taking the quiz")
-    public ResponseEntity<Map<String, Object>> getQuizForUser(@PathVariable Long id) {
+    public ResponseEntity<StudentQuizResponse> getQuizForUser(@PathVariable Long id) {
         return ResponseEntity.ok(quizService.getQuizForStudent(id));
     }
 
@@ -55,7 +55,7 @@ public class QuizController {
 
     @GetMapping("/attempts")
     @Operation(summary = "Get user previous attempts")
-    public ResponseEntity<List<QuizAttempt>> getUserAttempts(Authentication auth) {
+    public ResponseEntity<List<QuizAttemptResponse>> getUserAttempts(Authentication auth) {
         return ResponseEntity.ok(quizService.getAttempts(auth.getName()));
     }
 }

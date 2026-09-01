@@ -1,7 +1,10 @@
 package com.quizapp.controller;
 
-import com.quizapp.entity.Question;
-import com.quizapp.entity.Quiz;
+import com.quizapp.dto.request.QuestionRequest;
+import com.quizapp.dto.request.QuizRequest;
+import com.quizapp.dto.request.QuizUpdateRequest;
+import com.quizapp.dto.response.QuestionResponse;
+import com.quizapp.dto.response.QuizResponse;
 import com.quizapp.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -31,14 +34,15 @@ public class AdminController {
 
     @PostMapping("/quizzes")
     @Operation(summary = "Create a new quiz with questions")
-    public ResponseEntity<Quiz> createQuiz(@Valid @RequestBody Quiz quiz) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(adminService.createQuiz(quiz));
+    public ResponseEntity<QuizResponse> createQuiz(@Valid @RequestBody QuizRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(adminService.createQuiz(request));
     }
 
     @PutMapping("/quizzes/{id}")
     @Operation(summary = "Update quiz title and description")
-    public ResponseEntity<Quiz> updateQuiz(@PathVariable Long id, @Valid @RequestBody Quiz details) {
-        return ResponseEntity.ok(adminService.updateQuiz(id, details));
+    public ResponseEntity<QuizResponse> updateQuiz(@PathVariable Long id,
+                                                  @Valid @RequestBody QuizUpdateRequest request) {
+        return ResponseEntity.ok(adminService.updateQuiz(id, request));
     }
 
     @DeleteMapping("/quizzes/{id}")
@@ -50,8 +54,9 @@ public class AdminController {
 
     @PostMapping("/quizzes/{quizId}/questions")
     @Operation(summary = "Add a question to an existing quiz")
-    public ResponseEntity<Question> addQuestion(@PathVariable Long quizId, @Valid @RequestBody Question question) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(adminService.addQuestion(quizId, question));
+    public ResponseEntity<QuestionResponse> addQuestion(@PathVariable Long quizId,
+                                                       @Valid @RequestBody QuestionRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(adminService.addQuestion(quizId, request));
     }
 
     @DeleteMapping("/questions/{id}")

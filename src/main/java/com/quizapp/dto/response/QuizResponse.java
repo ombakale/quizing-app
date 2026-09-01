@@ -1,21 +1,20 @@
-package com.quizapp.dto;
+package com.quizapp.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Lightweight quiz view for the quiz list.
- * Deliberately excludes questions/options so answer keys are never exposed.
- */
+import java.util.List;
+
+/** Admin-facing quiz view, answer key included. */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class QuizSummaryResponse {
+public class QuizResponse {
     private Long id;
     private String title;
     private String description;
-    private int totalQuestions;
+    private List<QuestionResponse> questions;
 }

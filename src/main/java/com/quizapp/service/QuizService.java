@@ -2,7 +2,10 @@ package com.quizapp.service;
 
 import com.quizapp.dto.QuizResultResponse;
 import com.quizapp.dto.QuizSubmitRequest;
-import com.quizapp.dto.QuizSummaryResponse;
+import com.quizapp.dto.response.QuizAttemptResponse;
+import com.quizapp.dto.response.QuizSummaryResponse;
+import com.quizapp.dto.response.StudentQuizResponse;
+import com.quizapp.mapper.QuizMapper;
 import com.quizapp.entity.Option;
 import com.quizapp.entity.Question;
 import com.quizapp.entity.Quiz;
@@ -19,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -41,47 +43,16 @@ public class QuizService {
 
     @Transactional(readOnly = true)
     public List<QuizSummaryResponse> listQuizzes() {
-        return quizRepository.findAll().stream()
-                .map(quiz -> QuizSummaryResponse.builder()
-                        .id(quiz.getId())
-                        .title(quiz.getTitle())
-                        .description(quiz.getDescription())
-                        .totalQuestions(quiz.getQuestions().size())
-                        .build())
-                .toList();
+        return quizRepository.findAll().stream().map(QuizMapper::toSummary).toList();
     }
 
     /**
-     * The student view of a quiz. Built field by field rather than serialising the entity so
-     * the {@code correct} flag physically cannot reach the client.
+     * The student view of a quiz. StudentQuizResponse has no 'correct' field anywhere in its
+     * type graph, so the answer key cannot be serialised down this path.
      */
     @Transactional(readOnly = true)
-    public Map<String, Object> getQuizForStudent(Long quizId) {
-        Quiz quiz = requireQuiz(quizId);
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("id", quiz.getId());
-        response.put("title", quiz.getTitle());
-        response.put("description", quiz.getDescription());
-
-        List<Map<String, Object>> questions = new ArrayList<>();
-        for (Question question : quiz.getQuestions()) {
-            Map<String, Object> questionView = new LinkedHashMap<>();
-            questionView.put("id", question.getId());
-            questionView.put("text", question.getText());
-
-            List<Map<String, Object>> options = new ArrayList<>();
-            for (Option option : question.getOptions()) {
-                Map<String, Object> optionView = new LinkedHashMap<>();
-                optionView.put("id", option.getId());
-                optionView.put("text", option.getText());
-                options.add(optionView);
-            }
-            questionView.put("options", options);
-            questions.add(questionView);
-        }
-        response.put("questions", questions);
-        return response;
+    public StudentQuizResponse getQuizForStudent(Long quizId) {
+        return QuizMapper.toStudentResponse(requireQuiz(quizId));
     }
 
     @Transactional
@@ -94,8 +65,10 @@ public class QuizService {
     }
 
     @Transactional(readOnly = true)
-    public List<QuizAttempt> getAttempts(String username) {
-        return quizAttemptRepository.findByUserId(requireUser(username).getId());
+    public List<QuizAttemptResponse> getAttempts(String username) {
+        return quizAttemptRepository.findByUserId(requireUser(username).getId()).stream()
+                .map(QuizMapper::toResponse)
+                .toList();
     }
 
     // ------------------------------------------------------------------ internals
