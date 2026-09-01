@@ -52,10 +52,14 @@
                         </div>
                         <div class="mb-3" id="roleGroup" style="display: none;">
                             <label class="form-label">Role</label>
-                            <select id="role" class="form-select">
+                            <select id="role" class="form-select" onchange="toggleAdminCode()">
                                 <option value="USER">Student (User)</option>
                                 <option value="ADMIN">Admin</option>
                             </select>
+                        </div>
+                        <div class="mb-3" id="adminCodeGroup" style="display: none;">
+                            <label class="form-label">Admin registration code</label>
+                            <input type="password" id="adminCode" class="form-control" placeholder="Required for admin accounts">
                         </div>
                         <div id="authError" class="alert alert-danger py-2" style="display: none;"></div>
                         <button type="submit" class="btn btn-primary w-100" id="authSubmitBtn">Login</button>
@@ -158,8 +162,27 @@
             document.querySelectorAll("#pills-tab .nav-link").forEach(el => el.classList.remove("active"));
             event.target.classList.add("active");
             document.getElementById("roleGroup").style.display = mode === "register" ? "block" : "none";
+            toggleAdminCode();
             document.getElementById("authSubmitBtn").innerText = mode === "register" ? "Register" : "Login";
             document.getElementById("authError").style.display = "none";
+        }
+
+        // The API returns errors as {status, error, message, path, fieldErrors?}.
+        // Surface that message instead of rendering an error body as if it were data.
+        async function readJson(res) {
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                const fieldErrors = data && data.fieldErrors
+                    ? Object.values(data.fieldErrors).join(", ")
+                    : null;
+                throw new Error(fieldErrors || (data && data.message) || `Request failed (${res.status})`);
+            }
+            return data;
+        }
+
+        function toggleAdminCode() {
+            const isAdminRegister = authMode === "register" && document.getElementById("role").value === "ADMIN";
+            document.getElementById("adminCodeGroup").style.display = isAdminRegister ? "block" : "none";
         }
 
         async function handleAuth(e) {
@@ -167,12 +190,13 @@
             const username = document.getElementById("username").value.trim();
             const password = document.getElementById("password").value.trim();
             const role = document.getElementById("role").value;
+            const adminCode = document.getElementById("adminCode").value.trim();
             const errorDiv = document.getElementById("authError");
 
             errorDiv.style.display = "none";
 
             const endpoint = authMode === "register" ? "/auth/register" : "/auth/login";
-            const payload = authMode === "register" ? { username, password, role } : { username, password };
+            const payload = authMode === "register" ? { username, password, role, adminCode } : { username, password };
 
             try {
                 const res = await fetch(API_URL + endpoint, {
@@ -181,10 +205,7 @@
                     body: JSON.stringify(payload)
                 });
 
-                const data = await res.json();
-                if (!res.ok) {
-                    throw new Error(data.message || data || "Authentication failed");
-                }
+                const data = await readJson(res);
 
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("username", data.username);
@@ -255,7 +276,7 @@
                 const res = await fetch(API_URL + "/quizzes/" + quizId, {
                     headers: { "Authorization": "Bearer " + token }
                 });
-                activeQuiz = await res.json();
+                activeQuiz = await readJson(res);
                 selectedAnswers = {};
 
                 document.getElementById("quizListRow").style.display = "none";
@@ -289,7 +310,7 @@
                     `;
                 });
             } catch (err) {
-                alert("Failed to load quiz");
+                alert("Failed to load quiz: " + err.message);
             }
         }
 
@@ -316,7 +337,7 @@
                     body: JSON.stringify({ answers: answersPayload })
                 });
 
-                const result = await res.json();
+                const result = await readJson(res);
 
                 document.getElementById("takeQuizSection").style.display = "none";
                 document.getElementById("resultSection").style.display = "block";
@@ -325,7 +346,7 @@
                 document.getElementById("resultScore").innerText = `${result.score} / ${result.totalQuestions}`;
                 document.getElementById("resultPercentage").innerText = `Score: ${result.percentage}%`;
             } catch (err) {
-                alert("Failed to submit quiz");
+                alert("Failed to submit quiz: " + err.message);
             }
         }
 
@@ -383,7 +404,11 @@
                     document.getElementById("opt2").value = "";
                     loadQuizzes();
                 } else {
-                    alert("Failed to create quiz (Admin token required)");
+                    const data = await res.json().catch(() => null);
+                    const fieldErrors = data && data.fieldErrors
+                        ? Object.values(data.fieldErrors).join(", ")
+                        : null;
+                    alert("Failed to create quiz: " + (fieldErrors || (data && data.message) || res.status));
                 }
             } catch (err) {
                 alert("Error creating quiz");

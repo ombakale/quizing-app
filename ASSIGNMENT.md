@@ -1,0 +1,5 @@
+# Assignment – Quiz Application API
+
+Build a REST API for a simple Quiz Application using any preferred tech stack and database. The application should support user registration/login, viewing quizzes, answering questions, submitting quizzes and receiving scores. Admin users should be able to create, update and delete quizzes/questions. Implement authentication, authorization, validation, error handling and automated tests. Dockerize the application and deploy it on GCP Cloud Run using the available free tier/trial credits. Provide Swagger/OpenAPI documentation, a README and the deployed API URL.
+
+Additionally, expose the deployed APIs through the DigitalAPI Gateway using https://trial.digitalapi.ai and publish the API on the DigitalAPI Developer Portal/Marketplace with proper documentation. The final end-to-end demo should cover the complete flow from API development and deployment to gateway exposure and marketplace/portal publishing, along with a technical deep dive explaining the architecture, technologies and key concepts used.

@@ -1,16 +1,24 @@
 package com.quizapp.controller;
 
-import com.quizapp.entity.Question;
-import com.quizapp.entity.Quiz;
-import com.quizapp.repository.QuestionRepository;
-import com.quizapp.repository.QuizRepository;
+import com.quizapp.dto.request.QuestionRequest;
+import com.quizapp.dto.request.QuizRequest;
+import com.quizapp.dto.request.QuizUpdateRequest;
+import com.quizapp.dto.response.QuestionResponse;
+import com.quizapp.dto.response.QuizResponse;
+import com.quizapp.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -18,62 +26,50 @@ import org.springframework.web.bind.annotation.*;
 @SecurityRequirement(name = "bearerAuth")
 public class AdminController {
 
-    @Autowired
-    private QuizRepository quizRepository;
+    private final AdminService adminService;
 
-    @Autowired
-    private QuestionRepository questionRepository;
+    public AdminController(AdminService adminService) {
+        this.adminService = adminService;
+    }
 
     @PostMapping("/quizzes")
     @Operation(summary = "Create a new quiz with questions")
-    public ResponseEntity<Quiz> createQuiz(@RequestBody Quiz quiz) {
-        if (quiz.getQuestions() != null) {
-            quiz.getQuestions().forEach(q -> {
-                q.setQuiz(quiz);
-                if (q.getOptions() != null) {
-                    q.getOptions().forEach(o -> o.setQuestion(q));
-                }
-            });
-        }
-        Quiz savedQuiz = quizRepository.save(quiz);
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedQuiz);
+    public ResponseEntity<QuizResponse> createQuiz(@Valid @RequestBody QuizRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(adminService.createQuiz(request));
     }
 
     @PutMapping("/quizzes/{id}")
     @Operation(summary = "Update quiz title and description")
-    public ResponseEntity<Quiz> updateQuiz(@PathVariable Long id, @RequestBody Quiz details) {
-        return quizRepository.findById(id).map(quiz -> {
-            quiz.setTitle(details.getTitle());
-            quiz.setDescription(details.getDescription());
-            return ResponseEntity.ok(quizRepository.save(quiz));
-        }).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<QuizResponse> updateQuiz(@PathVariable Long id,
+                                                  @Valid @RequestBody QuizUpdateRequest request) {
+        return ResponseEntity.ok(adminService.updateQuiz(id, request));
     }
 
     @DeleteMapping("/quizzes/{id}")
     @Operation(summary = "Delete a quiz")
     public ResponseEntity<Void> deleteQuiz(@PathVariable Long id) {
-        if (!quizRepository.existsById(id)) return ResponseEntity.notFound().build();
-        quizRepository.deleteById(id);
+        adminService.deleteQuiz(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/quizzes/{quizId}/questions")
     @Operation(summary = "Add a question to an existing quiz")
-    public ResponseEntity<Question> addQuestion(@PathVariable Long quizId, @RequestBody Question question) {
-        return quizRepository.findById(quizId).map(quiz -> {
-            question.setQuiz(quiz);
-            if (question.getOptions() != null) {
-                question.getOptions().forEach(o -> o.setQuestion(question));
-            }
-            return ResponseEntity.status(HttpStatus.CREATED).body(questionRepository.save(question));
-        }).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<QuestionResponse> addQuestion(@PathVariable Long quizId,
+                                                       @Valid @RequestBody QuestionRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(adminService.addQuestion(quizId, request));
+    }
+
+    @PutMapping("/questions/{id}")
+    @Operation(summary = "Update a question's text and replace its options")
+    public ResponseEntity<QuestionResponse> updateQuestion(@PathVariable Long id,
+                                                           @Valid @RequestBody QuestionRequest request) {
+        return ResponseEntity.ok(adminService.updateQuestion(id, request));
     }
 
     @DeleteMapping("/questions/{id}")
     @Operation(summary = "Delete a question")
     public ResponseEntity<Void> deleteQuestion(@PathVariable Long id) {
-        if (!questionRepository.existsById(id)) return ResponseEntity.notFound().build();
-        questionRepository.deleteById(id);
+        adminService.deleteQuestion(id);
         return ResponseEntity.noContent().build();
     }
 }

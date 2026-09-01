@@ -1,3 +1,7 @@
+server:
+  # Cloud Run injects PORT; 8080 keeps local runs unchanged
+  port: ${PORT:8080}
+
 spring:
   application:
     name: quiz-api
@@ -8,16 +12,23 @@ spring:
     password: password
   h2:
     console:
-      enabled: true
+      # Development aid only - disabled in the prod profile
+      enabled: ${H2_CONSOLE_ENABLED:true}
       path: /h2-console
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: false
 
+app:
+  admin:
+    # Anyone registering with role=ADMIN must supply this code. Override in prod.
+    registration-code: ${ADMIN_REGISTRATION_CODE:quiz-admin-2026}
+
 jwt:
-  secret: dGhpcy1pcy1hLXZlcnktc2VjdXJlLWFuZC1sb25nLXNlY3JldC1rZXktZm9yLWp3dC10b2tlbi1nZW5lcmF0aW9uLXF1aXotYXBw
-  expiration: 86400000
+  # Dev-only fallback. The prod profile requires JWT_SECRET to be supplied.
+  secret: ${JWT_SECRET:dGhpcy1pcy1hLXZlcnktc2VjdXJlLWFuZC1sb25nLXNlY3JldC1rZXktZm9yLWp3dC10b2tlbi1nZW5lcmF0aW9uLXF1aXotYXBw}
+  expiration: ${JWT_EXPIRATION:86400000}
 
 springdoc:
   swagger-ui:
