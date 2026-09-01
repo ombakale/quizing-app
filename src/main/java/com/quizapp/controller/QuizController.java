@@ -1,6 +1,7 @@
 package com.quizapp.controller;
 
 import com.quizapp.dto.QuizResultResponse;
+import com.quizapp.dto.QuizSummaryResponse;
 import com.quizapp.dto.QuizSubmitRequest;
 import com.quizapp.entity.*;
 import com.quizapp.repository.QuizAttemptRepository;
@@ -33,8 +34,16 @@ public class QuizController {
 
     @GetMapping
     @Operation(summary = "List all available quizzes")
-    public ResponseEntity<List<Quiz>> getAllQuizzes() {
-        return ResponseEntity.ok(quizRepository.findAll());
+    public ResponseEntity<List<QuizSummaryResponse>> getAllQuizzes() {
+        List<QuizSummaryResponse> summaries = quizRepository.findAll().stream()
+                .map(quiz -> QuizSummaryResponse.builder()
+                        .id(quiz.getId())
+                        .title(quiz.getTitle())
+                        .description(quiz.getDescription())
+                        .totalQuestions(quiz.getQuestions() != null ? quiz.getQuestions().size() : 0)
+                        .build())
+                .toList();
+        return ResponseEntity.ok(summaries);
     }
 
     @GetMapping("/{id}")

@@ -15,6 +15,11 @@ spring:
       ddl-auto: update
     show-sql: false
 
+app:
+  admin:
+    # Anyone registering with role=ADMIN must supply this code. Override in prod.
+    registration-code: ${ADMIN_REGISTRATION_CODE:quiz-admin-2026}
+
 jwt:
   secret: dGhpcy1pcy1hLXZlcnktc2VjdXJlLWFuZC1sb25nLXNlY3JldC1rZXktZm9yLWp3dC10b2tlbi1nZW5lcmF0aW9uLXF1aXotYXBw
   expiration: 86400000
