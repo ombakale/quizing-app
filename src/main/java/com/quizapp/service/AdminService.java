@@ -66,6 +66,30 @@ public class AdminService {
         return QuizMapper.toResponse(questionRepository.save(question));
     }
 
+    /**
+     * Replaces a question's text and its whole option set. Options are replaced rather than
+     * patched because their ids are meaningless to the caller and a partial update would leave
+     * the question in a half-scorable state.
+     */
+    @Transactional
+    public QuestionResponse updateQuestion(Long questionId, QuestionRequest request) {
+        Question question = questionRepository.findById(questionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Question", questionId));
+
+        Question replacement = QuizMapper.toEntity(request);
+        requireExactlyOneCorrectOption(replacement, 1);
+
+        question.setText(replacement.getText());
+        // orphanRemoval deletes the old rows; clear() in place so Hibernate tracks the change
+        question.getOptions().clear();
+        replacement.getOptions().forEach(option -> {
+            option.setQuestion(question);
+            question.getOptions().add(option);
+        });
+
+        return QuizMapper.toResponse(questionRepository.save(question));
+    }
+
     @Transactional
     public void deleteQuestion(Long questionId) {
         if (!questionRepository.existsById(questionId)) {

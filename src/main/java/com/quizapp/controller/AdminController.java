@@ -59,6 +59,13 @@ public class AdminController {
         return ResponseEntity.status(HttpStatus.CREATED).body(adminService.addQuestion(quizId, request));
     }
 
+    @PutMapping("/questions/{id}")
+    @Operation(summary = "Update a question's text and replace its options")
+    public ResponseEntity<QuestionResponse> updateQuestion(@PathVariable Long id,
+                                                           @Valid @RequestBody QuestionRequest request) {
+        return ResponseEntity.ok(adminService.updateQuestion(id, request));
+    }
+
     @DeleteMapping("/questions/{id}")
     @Operation(summary = "Delete a question")
     public ResponseEntity<Void> deleteQuestion(@PathVariable Long id) {
