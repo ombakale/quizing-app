@@ -35,6 +35,12 @@ public class SecurityConfig {
     @Autowired
     private JwtFilter jwtFilter;
 
+    @Autowired
+    private RestAuthEntryPoints.JsonAuthenticationEntryPoint authenticationEntryPoint;
+
+    @Autowired
+    private RestAuthEntryPoints.JsonAccessDeniedHandler accessDeniedHandler;
+
     /**
      * The H2 console is a local development aid only. It is opened up (and the frame-options
      * header relaxed) solely when the console is actually enabled, so a deployed instance with
@@ -55,6 +61,9 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
                 auth.anyRequest().authenticated();
             })
+            .exceptionHandling(handling -> handling
+                    .authenticationEntryPoint(authenticationEntryPoint)
+                    .accessDeniedHandler(accessDeniedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 

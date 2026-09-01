@@ -1,2 +1,12 @@
+com/quizapp/exception/ResourceNotFoundException.class
+com/quizapp/security/RestAuthEntryPoints$JsonAuthenticationEntryPoint.class
 com/quizapp/dto/QuizSummaryResponse.class
+com/quizapp/exception/DuplicateResourceException.class
+com/quizapp/exception/ForbiddenException.class
+com/quizapp/dto/ErrorResponse$ErrorResponseBuilder.class
+com/quizapp/exception/BadRequestException.class
+com/quizapp/security/RestAuthEntryPoints$JsonAccessDeniedHandler.class
 com/quizapp/dto/QuizSummaryResponse$QuizSummaryResponseBuilder.class
+com/quizapp/security/RestAuthEntryPoints.class
+com/quizapp/exception/UnauthorizedException.class
+com/quizapp/dto/ErrorResponse.class
