@@ -10,8 +10,11 @@ import java.util.List;
 
 public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> {
 
-    /** Newest attempt first, which is the order the history is read in. */
-    List<QuizAttempt> findByUserIdOrderByAttemptedAtDesc(Long userId);
+    /**
+     * Newest attempt first. attemptedAt is assigned in Java, so two attempts can share a
+     * timestamp; the id tiebreak keeps the order stable.
+     */
+    List<QuizAttempt> findByUserIdOrderByAttemptedAtDescIdDesc(Long userId);
 
     /**
      * Detaches attempts from a quiz that is about to be deleted, so the history survives

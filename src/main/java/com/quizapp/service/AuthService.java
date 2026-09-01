@@ -64,6 +64,13 @@ public class AuthService {
     }
 
     public AuthResponse login(AuthRequest request) {
+        // Guarded here rather than with @Valid: a missing credential is a 401, not a 400 telling
+        // the caller which format rules the stored password happens to break. BCrypt also throws
+        // on a null raw password, which would otherwise surface as a 500.
+        if (isBlank(request.getUsername()) || isBlank(request.getPassword())) {
+            throw new UnauthorizedException("Invalid username or password");
+        }
+
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new UnauthorizedException("Invalid username or password"));
 
@@ -72,6 +79,10 @@ public class AuthService {
         }
 
         return tokenFor(user);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private AuthResponse tokenFor(User user) {

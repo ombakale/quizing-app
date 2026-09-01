@@ -67,7 +67,7 @@ public class AdminService {
         Quiz quiz = requireQuiz(quizId);
 
         Question question = QuizMapper.toEntity(request);
-        requireExactlyOneCorrectOption(question, 1);
+        requireExactlyOneCorrectOption(question, "The question");
         question.setQuiz(quiz);
 
         return QuizMapper.toResponse(questionRepository.save(question));
@@ -84,7 +84,7 @@ public class AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Question", questionId));
 
         Question replacement = QuizMapper.toEntity(request);
-        requireExactlyOneCorrectOption(replacement, 1);
+        requireExactlyOneCorrectOption(replacement, "Question " + questionId);
 
         question.setText(replacement.getText());
         // orphanRemoval deletes the old rows; clear() in place so Hibernate tracks the change
@@ -115,15 +115,15 @@ public class AdminService {
     private void requireExactlyOneCorrectOption(List<Question> questions) {
         int position = 1;
         for (Question question : questions) {
-            requireExactlyOneCorrectOption(question, position++);
+            requireExactlyOneCorrectOption(question, "Question " + position++);
         }
     }
 
-    private void requireExactlyOneCorrectOption(Question question, int position) {
+    private void requireExactlyOneCorrectOption(Question question, String label) {
         long correctCount = question.getOptions().stream().filter(Option::isCorrect).count();
         if (correctCount != 1) {
             throw new BadRequestException(
-                    "Question " + position + " must have exactly one correct option (found " + correctCount + ")");
+                    label + " must have exactly one correct option (found " + correctCount + ")");
         }
     }
 

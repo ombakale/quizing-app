@@ -43,7 +43,7 @@ public class QuizService {
 
     @Transactional(readOnly = true)
     public List<QuizSummaryResponse> listQuizzes() {
-        return quizRepository.findAll().stream().map(QuizMapper::toSummary).toList();
+        return quizRepository.findAllSummaries();
     }
 
     /**
@@ -60,13 +60,14 @@ public class QuizService {
         Quiz quiz = requireQuiz(quizId);
         User user = requireUser(username);
 
+        requireScorable(quiz);
         Map<Long, Long> submission = validateAnswers(quiz, request);
         return score(quiz, user, submission);
     }
 
     @Transactional(readOnly = true)
     public List<QuizAttemptResponse> getAttempts(String username) {
-        return quizAttemptRepository.findByUserIdOrderByAttemptedAtDesc(requireUser(username).getId()).stream()
+        return quizAttemptRepository.findByUserIdOrderByAttemptedAtDescIdDesc(requireUser(username).getId()).stream()
                 .map(QuizMapper::toResponse)
                 .toList();
     }
@@ -115,25 +116,36 @@ public class QuizService {
         return submission;
     }
 
+    /**
+     * A question with zero or several correct options cannot be judged. Rather than quietly
+     * dropping it from the denominator - which would make one quiz report different totals to
+     * different students, and hand out a 7/7 for a 10-question quiz - the submission is refused
+     * so an admin fixes the quiz. Content authored through AdminService can never reach this
+     * state; quizzes predating that validation can.
+     */
+    private void requireScorable(Quiz quiz) {
+        for (Question question : quiz.getQuestions()) {
+            long correctCount = question.getOptions().stream().filter(Option::isCorrect).count();
+            if (correctCount != 1) {
+                throw new BadRequestException("Quiz " + quiz.getId() + " cannot be scored: question "
+                        + question.getId() + " has " + correctCount + " correct options, expected exactly one");
+            }
+        }
+    }
+
     private QuizResultResponse score(Quiz quiz, User user, Map<Long, Long> submission) {
         int score = 0;
-        int totalQuestions = 0;
+        int totalQuestions = quiz.getQuestions().size();
         List<QuizResultResponse.QuestionDetail> details = new ArrayList<>();
 
         for (Question question : quiz.getQuestions()) {
             Long selectedOptionId = submission.get(question.getId());
-            List<Option> correctOptions = question.getOptions().stream().filter(Option::isCorrect).toList();
+            Long correctOptionId = question.getOptions().stream()
+                    .filter(Option::isCorrect)
+                    .findFirst()
+                    .map(Option::getId)
+                    .orElseThrow();
 
-            // A question without exactly one correct option cannot be scored fairly, so it is
-            // left out of the total instead of being counted against the student.
-            if (correctOptions.size() != 1) {
-                details.add(new QuizResultResponse.QuestionDetail(
-                        question.getId(), question.getText(), selectedOptionId, null, false));
-                continue;
-            }
-
-            totalQuestions++;
-            Long correctOptionId = correctOptions.get(0).getId();
             boolean isCorrect = correctOptionId.equals(selectedOptionId);
             if (isCorrect) score++;
 
