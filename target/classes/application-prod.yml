@@ -1,0 +1,14 @@
+# Production profile - activate with SPRING_PROFILES_ACTIVE=prod (e.g. on Cloud Run).
+# JWT_SECRET and ADMIN_REGISTRATION_CODE have no defaults here, so the app fails fast
+# at startup instead of running on well-known development values.
+spring:
+  h2:
+    console:
+      enabled: false
+
+jwt:
+  secret: ${JWT_SECRET}
+
+app:
+  admin:
+    registration-code: ${ADMIN_REGISTRATION_CODE}
