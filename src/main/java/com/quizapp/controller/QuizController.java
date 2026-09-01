@@ -120,9 +120,12 @@ public class QuizController {
                     return badRequest("Option " + selectedOptionId + " does not belong to question " + questionId);
                 }
 
-                if (submissionMap.put(questionId, selectedOptionId) != null) {
+                // containsKey rather than the return of put(): a previous answer with a null
+                // selectedOptionId also makes put() return null, hiding the duplicate.
+                if (submissionMap.containsKey(questionId)) {
                     return badRequest("Duplicate answer submitted for question " + questionId);
                 }
+                submissionMap.put(questionId, selectedOptionId);
             }
         }
 
