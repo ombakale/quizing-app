@@ -1,22 +1,21 @@
 package com.quizapp.controller;
 
-import com.quizapp.entity.Option;
-import jakarta.validation.Valid;
 import com.quizapp.entity.Question;
 import com.quizapp.entity.Quiz;
-import com.quizapp.exception.BadRequestException;
-import com.quizapp.exception.ResourceNotFoundException;
-import com.quizapp.repository.QuestionRepository;
-import com.quizapp.repository.QuizRepository;
+import com.quizapp.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -24,119 +23,41 @@ import java.util.List;
 @SecurityRequirement(name = "bearerAuth")
 public class AdminController {
 
-    @Autowired
-    private QuizRepository quizRepository;
+    private final AdminService adminService;
 
-    @Autowired
-    private QuestionRepository questionRepository;
+    public AdminController(AdminService adminService) {
+        this.adminService = adminService;
+    }
 
     @PostMapping("/quizzes")
     @Operation(summary = "Create a new quiz with questions")
     public ResponseEntity<Quiz> createQuiz(@Valid @RequestBody Quiz quiz) {
-        String error = validateQuiz(quiz);
-        if (error != null) throw new BadRequestException(error);
-
-        // Ids arriving in the body would turn save() into a merge, silently overwriting an
-        // existing quiz (and, through orphanRemoval, deleting its questions). Creation always
-        // means new rows.
-        quiz.setId(null);
-        if (quiz.getQuestions() != null) {
-            quiz.getQuestions().forEach(q -> {
-                q.setId(null);
-                q.setQuiz(quiz);
-                if (q.getOptions() != null) {
-                    q.getOptions().forEach(o -> {
-                        o.setId(null);
-                        o.setQuestion(q);
-                    });
-                }
-            });
-        }
-        Quiz savedQuiz = quizRepository.save(quiz);
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedQuiz);
+        return ResponseEntity.status(HttpStatus.CREATED).body(adminService.createQuiz(quiz));
     }
 
     @PutMapping("/quizzes/{id}")
     @Operation(summary = "Update quiz title and description")
     public ResponseEntity<Quiz> updateQuiz(@PathVariable Long id, @Valid @RequestBody Quiz details) {
-        Quiz quiz = quizRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz", id));
-
-        // Only these two fields are updatable; any id or questions in the body are ignored
-        quiz.setTitle(details.getTitle());
-        quiz.setDescription(details.getDescription());
-        return ResponseEntity.ok(quizRepository.save(quiz));
+        return ResponseEntity.ok(adminService.updateQuiz(id, details));
     }
 
     @DeleteMapping("/quizzes/{id}")
     @Operation(summary = "Delete a quiz")
     public ResponseEntity<Void> deleteQuiz(@PathVariable Long id) {
-        if (!quizRepository.existsById(id)) throw new ResourceNotFoundException("Quiz", id);
-        quizRepository.deleteById(id);
+        adminService.deleteQuiz(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/quizzes/{quizId}/questions")
     @Operation(summary = "Add a question to an existing quiz")
     public ResponseEntity<Question> addQuestion(@PathVariable Long quizId, @Valid @RequestBody Question question) {
-        String error = validateQuestion(question, 1);
-        if (error != null) throw new BadRequestException(error);
-
-        Quiz quiz = quizRepository.findById(quizId)
-                .orElseThrow(() -> new ResourceNotFoundException("Quiz", quizId));
-
-        // Same reasoning as createQuiz: a body-supplied id must not hijack an existing row
-        question.setId(null);
-        question.setQuiz(quiz);
-        if (question.getOptions() != null) {
-            question.getOptions().forEach(o -> {
-                o.setId(null);
-                o.setQuestion(question);
-            });
-        }
-        return ResponseEntity.status(HttpStatus.CREATED).body(questionRepository.save(question));
+        return ResponseEntity.status(HttpStatus.CREATED).body(adminService.addQuestion(quizId, question));
     }
 
     @DeleteMapping("/questions/{id}")
     @Operation(summary = "Delete a question")
     public ResponseEntity<Void> deleteQuestion(@PathVariable Long id) {
-        if (!questionRepository.existsById(id)) throw new ResourceNotFoundException("Question", id);
-        questionRepository.deleteById(id);
+        adminService.deleteQuestion(id);
         return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * A quiz must be answerable and scorable: every question needs real text, at least two
-     * options, and exactly one option flagged as correct.
-     */
-    private String validateQuiz(Quiz quiz) {
-        if (quiz.getQuestions() == null || quiz.getQuestions().isEmpty()) {
-            return "A quiz must contain at least one question";
-        }
-
-        int position = 1;
-        for (Question question : quiz.getQuestions()) {
-            String error = validateQuestion(question, position++);
-            if (error != null) return error;
-        }
-        return null;
-    }
-
-    private String validateQuestion(Question question, int position) {
-        if (question == null) return "Question " + position + " is missing";
-
-        List<Option> options = question.getOptions();
-        if (options == null || options.size() < 2) {
-            return "Question " + position + " must have at least two options";
-        }
-        if (options.stream().anyMatch(o -> o == null)) {
-            return "Question " + position + " has an empty option entry";
-        }
-
-        long correctCount = options.stream().filter(Option::isCorrect).count();
-        if (correctCount != 1) {
-            return "Question " + position + " must have exactly one correct option (found " + correctCount + ")";
-        }
-        return null;
     }
 }

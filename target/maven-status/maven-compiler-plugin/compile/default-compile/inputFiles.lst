@@ -1,6 +1,7 @@
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/exception/UnauthorizedException.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/dto/AuthRequest.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/dto/AuthResponse.java
+/Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/service/QuizService.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/entity/Option.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/entity/QuizAttempt.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/exception/ResourceNotFoundException.java
@@ -19,6 +20,7 @@
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/security/JwtFilter.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/dto/ErrorResponse.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/controller/QuizController.java
+/Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/service/AuthService.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/exception/DuplicateResourceException.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/security/JwtUtil.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/QuizApplication.java
@@ -28,3 +30,4 @@
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/repository/QuizAttemptRepository.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/repository/QuizRepository.java
 /Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/exception/BadRequestException.java
+/Users/gauravbakale/Documents/personal/projects/test/quzzing_app/quizing-app/src/main/java/com/quizapp/service/AdminService.java
