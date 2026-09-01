@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import com.quizapp.dto.AuthResponse;
 import com.quizapp.entity.User;
 import com.quizapp.exception.DuplicateResourceException;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.quizapp.exception.ForbiddenException;
 import com.quizapp.exception.UnauthorizedException;
 import com.quizapp.repository.UserRepository;
@@ -58,7 +59,12 @@ public class AuthController {
                 .role(role)
                 .build();
 
-        userRepository.save(user);
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException ex) {
+            // existsByUsername above is not atomic; the unique constraint is the real guard
+            throw new DuplicateResourceException("Username '" + request.getUsername() + "' is already taken");
+        }
 
         String token = jwtUtil.generateToken(user.getUsername(), user.getRole());
         return ResponseEntity.status(HttpStatus.CREATED).body(new AuthResponse(token, user.getUsername(), user.getRole()));

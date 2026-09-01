@@ -36,11 +36,19 @@ public class AdminController {
         String error = validateQuiz(quiz);
         if (error != null) throw new BadRequestException(error);
 
+        // Ids arriving in the body would turn save() into a merge, silently overwriting an
+        // existing quiz (and, through orphanRemoval, deleting its questions). Creation always
+        // means new rows.
+        quiz.setId(null);
         if (quiz.getQuestions() != null) {
             quiz.getQuestions().forEach(q -> {
+                q.setId(null);
                 q.setQuiz(quiz);
                 if (q.getOptions() != null) {
-                    q.getOptions().forEach(o -> o.setQuestion(q));
+                    q.getOptions().forEach(o -> {
+                        o.setId(null);
+                        o.setQuestion(q);
+                    });
                 }
             });
         }
@@ -54,6 +62,7 @@ public class AdminController {
         Quiz quiz = quizRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz", id));
 
+        // Only these two fields are updatable; any id or questions in the body are ignored
         quiz.setTitle(details.getTitle());
         quiz.setDescription(details.getDescription());
         return ResponseEntity.ok(quizRepository.save(quiz));
@@ -76,9 +85,14 @@ public class AdminController {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz", quizId));
 
+        // Same reasoning as createQuiz: a body-supplied id must not hijack an existing row
+        question.setId(null);
         question.setQuiz(quiz);
         if (question.getOptions() != null) {
-            question.getOptions().forEach(o -> o.setQuestion(question));
+            question.getOptions().forEach(o -> {
+                o.setId(null);
+                o.setQuestion(question);
+            });
         }
         return ResponseEntity.status(HttpStatus.CREATED).body(questionRepository.save(question));
     }

@@ -167,6 +167,19 @@
             document.getElementById("authError").style.display = "none";
         }
 
+        // The API returns errors as {status, error, message, path, fieldErrors?}.
+        // Surface that message instead of rendering an error body as if it were data.
+        async function readJson(res) {
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                const fieldErrors = data && data.fieldErrors
+                    ? Object.values(data.fieldErrors).join(", ")
+                    : null;
+                throw new Error(fieldErrors || (data && data.message) || `Request failed (${res.status})`);
+            }
+            return data;
+        }
+
         function toggleAdminCode() {
             const isAdminRegister = authMode === "register" && document.getElementById("role").value === "ADMIN";
             document.getElementById("adminCodeGroup").style.display = isAdminRegister ? "block" : "none";
@@ -192,10 +205,7 @@
                     body: JSON.stringify(payload)
                 });
 
-                const data = await res.json();
-                if (!res.ok) {
-                    throw new Error(data.message || data || "Authentication failed");
-                }
+                const data = await readJson(res);
 
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("username", data.username);
@@ -266,7 +276,7 @@
                 const res = await fetch(API_URL + "/quizzes/" + quizId, {
                     headers: { "Authorization": "Bearer " + token }
                 });
-                activeQuiz = await res.json();
+                activeQuiz = await readJson(res);
                 selectedAnswers = {};
 
                 document.getElementById("quizListRow").style.display = "none";
@@ -300,7 +310,7 @@
                     `;
                 });
             } catch (err) {
-                alert("Failed to load quiz");
+                alert("Failed to load quiz: " + err.message);
             }
         }
 
@@ -327,7 +337,7 @@
                     body: JSON.stringify({ answers: answersPayload })
                 });
 
-                const result = await res.json();
+                const result = await readJson(res);
 
                 document.getElementById("takeQuizSection").style.display = "none";
                 document.getElementById("resultSection").style.display = "block";
@@ -336,7 +346,7 @@
                 document.getElementById("resultScore").innerText = `${result.score} / ${result.totalQuestions}`;
                 document.getElementById("resultPercentage").innerText = `Score: ${result.percentage}%`;
             } catch (err) {
-                alert("Failed to submit quiz");
+                alert("Failed to submit quiz: " + err.message);
             }
         }
 
@@ -394,7 +404,11 @@
                     document.getElementById("opt2").value = "";
                     loadQuizzes();
                 } else {
-                    alert("Failed to create quiz (Admin token required)");
+                    const data = await res.json().catch(() => null);
+                    const fieldErrors = data && data.fieldErrors
+                        ? Object.values(data.fieldErrors).join(", ")
+                        : null;
+                    alert("Failed to create quiz: " + (fieldErrors || (data && data.message) || res.status));
                 }
             } catch (err) {
                 alert("Error creating quiz");
