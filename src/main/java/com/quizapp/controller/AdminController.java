@@ -4,6 +4,8 @@ import com.quizapp.entity.Option;
 import jakarta.validation.Valid;
 import com.quizapp.entity.Question;
 import com.quizapp.entity.Quiz;
+import com.quizapp.exception.BadRequestException;
+import com.quizapp.exception.ResourceNotFoundException;
 import com.quizapp.repository.QuestionRepository;
 import com.quizapp.repository.QuizRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,7 +17,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -31,9 +32,9 @@ public class AdminController {
 
     @PostMapping("/quizzes")
     @Operation(summary = "Create a new quiz with questions")
-    public ResponseEntity<?> createQuiz(@Valid @RequestBody Quiz quiz) {
+    public ResponseEntity<Quiz> createQuiz(@Valid @RequestBody Quiz quiz) {
         String error = validateQuiz(quiz);
-        if (error != null) return badRequest(error);
+        if (error != null) throw new BadRequestException(error);
 
         if (quiz.getQuestions() != null) {
             quiz.getQuestions().forEach(q -> {
@@ -49,41 +50,43 @@ public class AdminController {
 
     @PutMapping("/quizzes/{id}")
     @Operation(summary = "Update quiz title and description")
-    public ResponseEntity<?> updateQuiz(@PathVariable Long id, @Valid @RequestBody Quiz details) {
-        return quizRepository.findById(id).<ResponseEntity<?>>map(quiz -> {
-            quiz.setTitle(details.getTitle());
-            quiz.setDescription(details.getDescription());
-            return ResponseEntity.ok(quizRepository.save(quiz));
-        }).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<Quiz> updateQuiz(@PathVariable Long id, @Valid @RequestBody Quiz details) {
+        Quiz quiz = quizRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz", id));
+
+        quiz.setTitle(details.getTitle());
+        quiz.setDescription(details.getDescription());
+        return ResponseEntity.ok(quizRepository.save(quiz));
     }
 
     @DeleteMapping("/quizzes/{id}")
     @Operation(summary = "Delete a quiz")
     public ResponseEntity<Void> deleteQuiz(@PathVariable Long id) {
-        if (!quizRepository.existsById(id)) return ResponseEntity.notFound().build();
+        if (!quizRepository.existsById(id)) throw new ResourceNotFoundException("Quiz", id);
         quizRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/quizzes/{quizId}/questions")
     @Operation(summary = "Add a question to an existing quiz")
-    public ResponseEntity<?> addQuestion(@PathVariable Long quizId, @Valid @RequestBody Question question) {
+    public ResponseEntity<Question> addQuestion(@PathVariable Long quizId, @Valid @RequestBody Question question) {
         String error = validateQuestion(question, 1);
-        if (error != null) return badRequest(error);
+        if (error != null) throw new BadRequestException(error);
 
-        return quizRepository.findById(quizId).<ResponseEntity<?>>map(quiz -> {
-            question.setQuiz(quiz);
-            if (question.getOptions() != null) {
-                question.getOptions().forEach(o -> o.setQuestion(question));
-            }
-            return ResponseEntity.status(HttpStatus.CREATED).body(questionRepository.save(question));
-        }).orElse(ResponseEntity.notFound().build());
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz", quizId));
+
+        question.setQuiz(quiz);
+        if (question.getOptions() != null) {
+            question.getOptions().forEach(o -> o.setQuestion(question));
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(questionRepository.save(question));
     }
 
     @DeleteMapping("/questions/{id}")
     @Operation(summary = "Delete a question")
     public ResponseEntity<Void> deleteQuestion(@PathVariable Long id) {
-        if (!questionRepository.existsById(id)) return ResponseEntity.notFound().build();
+        if (!questionRepository.existsById(id)) throw new ResourceNotFoundException("Question", id);
         questionRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
@@ -121,9 +124,5 @@ public class AdminController {
             return "Question " + position + " must have exactly one correct option (found " + correctCount + ")";
         }
         return null;
-    }
-
-    private ResponseEntity<Map<String, String>> badRequest(String message) {
-        return ResponseEntity.badRequest().body(Map.of("message", message));
     }
 }

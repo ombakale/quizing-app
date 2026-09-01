@@ -4,6 +4,9 @@ import com.quizapp.dto.AuthRequest;
 import jakarta.validation.Valid;
 import com.quizapp.dto.AuthResponse;
 import com.quizapp.entity.User;
+import com.quizapp.exception.DuplicateResourceException;
+import com.quizapp.exception.ForbiddenException;
+import com.quizapp.exception.UnauthorizedException;
 import com.quizapp.repository.UserRepository;
 import com.quizapp.security.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,7 +20,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -38,14 +40,14 @@ public class AuthController {
 
     @PostMapping("/register")
     @Operation(summary = "Register a new user, or an admin when a valid adminCode is supplied")
-    public ResponseEntity<?> register(@Valid @RequestBody AuthRequest request) {
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody AuthRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", "Username is already taken"));
+            throw new DuplicateResourceException("Username '" + request.getUsername() + "' is already taken");
         }
 
         boolean wantsAdmin = request.getRole() != null && request.getRole().equalsIgnoreCase("ADMIN");
         if (wantsAdmin && !matchesAdminCode(request.getAdminCode())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Invalid admin registration code"));
+            throw new ForbiddenException("Invalid admin registration code");
         }
 
         String role = wantsAdmin ? "ADMIN" : "USER";
@@ -64,11 +66,12 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "Login to get JWT token")
-    public ResponseEntity<?> login(@RequestBody AuthRequest request) {
-        User user = userRepository.findByUsername(request.getUsername()).orElse(null);
+    public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new UnauthorizedException("Invalid username or password"));
 
-        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Invalid username or password"));
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new UnauthorizedException("Invalid username or password");
         }
 
         String token = jwtUtil.generateToken(user.getUsername(), user.getRole());

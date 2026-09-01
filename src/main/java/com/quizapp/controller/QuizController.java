@@ -1,6 +1,9 @@
 package com.quizapp.controller;
 
 import com.quizapp.dto.QuizResultResponse;
+import com.quizapp.exception.BadRequestException;
+import com.quizapp.exception.ResourceNotFoundException;
+import com.quizapp.exception.UnauthorizedException;
 import jakarta.validation.Valid;
 import com.quizapp.dto.QuizSummaryResponse;
 import com.quizapp.dto.QuizSubmitRequest;
@@ -12,7 +15,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -50,9 +52,9 @@ public class QuizController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get quiz questions for taking the quiz")
-    public ResponseEntity<?> getQuizForUser(@PathVariable Long id) {
-        Quiz quiz = quizRepository.findById(id).orElse(null);
-        if (quiz == null) return ResponseEntity.notFound().build();
+    public ResponseEntity<Map<String, Object>> getQuizForUser(@PathVariable Long id) {
+        Quiz quiz = quizRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz", id));
 
         // Build student response (hide correctness flags)
         Map<String, Object> response = new HashMap<>();
@@ -82,19 +84,15 @@ public class QuizController {
 
     @PostMapping("/{id}/submit")
     @Operation(summary = "Submit answers and receive calculated score")
-    public ResponseEntity<?> submitQuiz(
+    public ResponseEntity<QuizResultResponse> submitQuiz(
             @PathVariable Long id,
             Authentication auth,
             @Valid @RequestBody QuizSubmitRequest request) {
 
-        Quiz quiz = quizRepository.findById(id).orElse(null);
-        if (quiz == null) return ResponseEntity.notFound().build();
+        Quiz quiz = quizRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quiz", id));
 
-        User user = userRepository.findByUsername(auth.getName()).orElse(null);
-        if (user == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Authenticated user no longer exists"));
-        }
+        User user = currentUser(auth);
 
         Map<Long, Question> questionsById = new HashMap<>();
         for (Question q : quiz.getQuestions()) {
@@ -108,19 +106,20 @@ public class QuizController {
                 Long questionId = item.getQuestionId();
                 Question question = questionsById.get(questionId);
                 if (question == null) {
-                    return badRequest("Question " + questionId + " does not belong to quiz " + id);
+                    throw new BadRequestException("Question " + questionId + " does not belong to quiz " + id);
                 }
 
                 Long selectedOptionId = item.getSelectedOptionId();
                 if (selectedOptionId != null
                         && question.getOptions().stream().noneMatch(o -> selectedOptionId.equals(o.getId()))) {
-                    return badRequest("Option " + selectedOptionId + " does not belong to question " + questionId);
+                    throw new BadRequestException(
+                            "Option " + selectedOptionId + " does not belong to question " + questionId);
                 }
 
                 // containsKey rather than the return of put(): a previous answer with a null
                 // selectedOptionId also makes put() return null, hiding the duplicate.
                 if (submissionMap.containsKey(questionId)) {
-                    return badRequest("Duplicate answer submitted for question " + questionId);
+                    throw new BadRequestException("Duplicate answer submitted for question " + questionId);
                 }
                 submissionMap.put(questionId, selectedOptionId);
             }
@@ -180,16 +179,14 @@ public class QuizController {
         return ResponseEntity.ok(result);
     }
 
-    private ResponseEntity<Map<String, String>> badRequest(String message) {
-        return ResponseEntity.badRequest().body(Map.of("message", message));
+    private User currentUser(Authentication auth) {
+        return userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new UnauthorizedException("Authenticated user no longer exists"));
     }
 
     @GetMapping("/attempts")
     @Operation(summary = "Get user previous attempts")
-    public ResponseEntity<?> getUserAttempts(Authentication auth) {
-        User user = userRepository.findByUsername(auth.getName()).orElse(null);
-        if (user == null) return ResponseEntity.notFound().build();
-
-        return ResponseEntity.ok(quizAttemptRepository.findByUserId(user.getId()));
+    public ResponseEntity<List<QuizAttempt>> getUserAttempts(Authentication auth) {
+        return ResponseEntity.ok(quizAttemptRepository.findByUserId(currentUser(auth).getId()));
     }
 }
