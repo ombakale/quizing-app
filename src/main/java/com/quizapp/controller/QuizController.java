@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -89,25 +90,62 @@ public class QuizController {
         if (quiz == null) return ResponseEntity.notFound().build();
 
         User user = userRepository.findByUsername(auth.getName()).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Authenticated user no longer exists"));
+        }
 
-        // Map submitted questionId -> selectedOptionId
+        Map<Long, Question> questionsById = new HashMap<>();
+        for (Question q : quiz.getQuestions()) {
+            questionsById.put(q.getId(), q);
+        }
+
+        // Validate every submitted answer actually belongs to this quiz before scoring anything
         Map<Long, Long> submissionMap = new HashMap<>();
         if (request.getAnswers() != null) {
             for (QuizSubmitRequest.AnswerItem item : request.getAnswers()) {
-                submissionMap.put(item.getQuestionId(), item.getSelectedOptionId());
+                Long questionId = item.getQuestionId();
+                if (questionId == null) {
+                    return badRequest("Each answer must include a questionId");
+                }
+
+                Question question = questionsById.get(questionId);
+                if (question == null) {
+                    return badRequest("Question " + questionId + " does not belong to quiz " + id);
+                }
+
+                Long selectedOptionId = item.getSelectedOptionId();
+                if (selectedOptionId != null
+                        && question.getOptions().stream().noneMatch(o -> selectedOptionId.equals(o.getId()))) {
+                    return badRequest("Option " + selectedOptionId + " does not belong to question " + questionId);
+                }
+
+                if (submissionMap.put(questionId, selectedOptionId) != null) {
+                    return badRequest("Duplicate answer submitted for question " + questionId);
+                }
             }
         }
 
         int score = 0;
-        int totalQuestions = quiz.getQuestions().size();
+        int totalQuestions = 0;
         List<QuizResultResponse.QuestionDetail> details = new ArrayList<>();
 
         for (Question q : quiz.getQuestions()) {
             Long selectedOptionId = submissionMap.get(q.getId());
-            Option correctOption = q.getOptions().stream().filter(Option::isCorrect).findFirst().orElse(null);
-            Long correctOptionId = correctOption != null ? correctOption.getId() : null;
+            List<Option> correctOptions = q.getOptions().stream().filter(Option::isCorrect).toList();
 
-            boolean isCorrect = (selectedOptionId != null && selectedOptionId.equals(correctOptionId));
+            // A question without exactly one correct option cannot be scored fairly, so it is
+            // left out of the total instead of being counted against the student.
+            if (correctOptions.size() != 1) {
+                details.add(new QuizResultResponse.QuestionDetail(
+                        q.getId(), q.getText(), selectedOptionId, null, false
+                ));
+                continue;
+            }
+
+            totalQuestions++;
+            Long correctOptionId = correctOptions.get(0).getId();
+            boolean isCorrect = correctOptionId.equals(selectedOptionId);
             if (isCorrect) score++;
 
             details.add(new QuizResultResponse.QuestionDetail(
@@ -119,7 +157,7 @@ public class QuizController {
 
         // Save Attempt
         QuizAttempt attempt = QuizAttempt.builder()
-                .userId(user != null ? user.getId() : null)
+                .userId(user.getId())
                 .quizId(quiz.getId())
                 .quizTitle(quiz.getTitle())
                 .score(score)
@@ -140,6 +178,10 @@ public class QuizController {
                 .build();
 
         return ResponseEntity.ok(result);
+    }
+
+    private ResponseEntity<Map<String, String>> badRequest(String message) {
+        return ResponseEntity.badRequest().body(Map.of("message", message));
     }
 
     @GetMapping("/attempts")
