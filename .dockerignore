@@ -1,0 +1,17 @@
+target/
+bin/
+.git/
+.gitignore
+.settings/
+.classpath
+.project
+.idea/
+*.iml
+.vscode/
+.playwright-mcp/
+*.png
+*.log
+README.md
+ASSIGNMENT.md
+Dockerfile
+.dockerignore

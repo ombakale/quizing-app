@@ -1,3 +1,7 @@
+server:
+  # Cloud Run injects PORT; 8080 keeps local runs unchanged
+  port: ${PORT:8080}
+
 spring:
   application:
     name: quiz-api

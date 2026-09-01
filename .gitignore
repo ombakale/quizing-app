@@ -1,0 +1,21 @@
+# Build output
+target/
+bin/
+*.jar
+*.war
+
+# Eclipse / IDE
+.settings/
+.classpath
+.project
+.idea/
+*.iml
+.vscode/
+
+# OS / editor noise
+.DS_Store
+*.log
+
+# Local tooling artefacts
+.playwright-mcp/
+*.png
