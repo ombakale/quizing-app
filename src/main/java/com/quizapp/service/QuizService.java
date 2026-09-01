@@ -66,7 +66,7 @@ public class QuizService {
 
     @Transactional(readOnly = true)
     public List<QuizAttemptResponse> getAttempts(String username) {
-        return quizAttemptRepository.findByUserId(requireUser(username).getId()).stream()
+        return quizAttemptRepository.findByUserIdOrderByAttemptedAtDesc(requireUser(username).getId()).stream()
                 .map(QuizMapper::toResponse)
                 .toList();
     }
@@ -144,8 +144,8 @@ public class QuizService {
         double percentage = totalQuestions > 0 ? (double) score / totalQuestions * 100.0 : 0.0;
 
         QuizAttempt attempt = quizAttemptRepository.save(QuizAttempt.builder()
-                .userId(user.getId())
-                .quizId(quiz.getId())
+                .user(user)
+                .quiz(quiz)
                 .quizTitle(quiz.getTitle())
                 .score(score)
                 .totalQuestions(totalQuestions)

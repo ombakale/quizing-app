@@ -134,7 +134,8 @@ public final class QuizMapper {
     public static QuizAttemptResponse toResponse(QuizAttempt attempt) {
         return QuizAttemptResponse.builder()
                 .id(attempt.getId())
-                .quizId(attempt.getQuizId())
+                // null once the quiz has been deleted; quizTitle keeps the history readable
+                .quizId(attempt.getQuiz() != null ? attempt.getQuiz().getId() : null)
                 .quizTitle(attempt.getQuizTitle())
                 .score(attempt.getScore())
                 .totalQuestions(attempt.getTotalQuestions())

@@ -12,6 +12,7 @@ import com.quizapp.mapper.QuizMapper;
 import com.quizapp.exception.BadRequestException;
 import com.quizapp.exception.ResourceNotFoundException;
 import com.quizapp.repository.QuestionRepository;
+import com.quizapp.repository.QuizAttemptRepository;
 import com.quizapp.repository.QuizRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,10 +25,14 @@ public class AdminService {
 
     private final QuizRepository quizRepository;
     private final QuestionRepository questionRepository;
+    private final QuizAttemptRepository quizAttemptRepository;
 
-    public AdminService(QuizRepository quizRepository, QuestionRepository questionRepository) {
+    public AdminService(QuizRepository quizRepository,
+                        QuestionRepository questionRepository,
+                        QuizAttemptRepository quizAttemptRepository) {
         this.quizRepository = quizRepository;
         this.questionRepository = questionRepository;
+        this.quizAttemptRepository = quizAttemptRepository;
     }
 
     @Transactional
@@ -52,6 +57,8 @@ public class AdminService {
         if (!quizRepository.existsById(quizId)) {
             throw new ResourceNotFoundException("Quiz", quizId);
         }
+        // Past attempts outlive the quiz, so detach them rather than let the FK block the delete
+        quizAttemptRepository.detachFromQuiz(quizId);
         quizRepository.deleteById(quizId);
     }
 
