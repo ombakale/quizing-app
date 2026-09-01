@@ -1,6 +1,7 @@
 package com.quizapp.controller;
 
 import com.quizapp.entity.Option;
+import jakarta.validation.Valid;
 import com.quizapp.entity.Question;
 import com.quizapp.entity.Quiz;
 import com.quizapp.repository.QuestionRepository;
@@ -30,7 +31,7 @@ public class AdminController {
 
     @PostMapping("/quizzes")
     @Operation(summary = "Create a new quiz with questions")
-    public ResponseEntity<?> createQuiz(@RequestBody Quiz quiz) {
+    public ResponseEntity<?> createQuiz(@Valid @RequestBody Quiz quiz) {
         String error = validateQuiz(quiz);
         if (error != null) return badRequest(error);
 
@@ -48,9 +49,7 @@ public class AdminController {
 
     @PutMapping("/quizzes/{id}")
     @Operation(summary = "Update quiz title and description")
-    public ResponseEntity<?> updateQuiz(@PathVariable Long id, @RequestBody Quiz details) {
-        if (isBlank(details.getTitle())) return badRequest("Quiz title is required");
-
+    public ResponseEntity<?> updateQuiz(@PathVariable Long id, @Valid @RequestBody Quiz details) {
         return quizRepository.findById(id).<ResponseEntity<?>>map(quiz -> {
             quiz.setTitle(details.getTitle());
             quiz.setDescription(details.getDescription());
@@ -68,7 +67,7 @@ public class AdminController {
 
     @PostMapping("/quizzes/{quizId}/questions")
     @Operation(summary = "Add a question to an existing quiz")
-    public ResponseEntity<?> addQuestion(@PathVariable Long quizId, @RequestBody Question question) {
+    public ResponseEntity<?> addQuestion(@PathVariable Long quizId, @Valid @RequestBody Question question) {
         String error = validateQuestion(question, 1);
         if (error != null) return badRequest(error);
 
@@ -94,7 +93,6 @@ public class AdminController {
      * options, and exactly one option flagged as correct.
      */
     private String validateQuiz(Quiz quiz) {
-        if (isBlank(quiz.getTitle())) return "Quiz title is required";
         if (quiz.getQuestions() == null || quiz.getQuestions().isEmpty()) {
             return "A quiz must contain at least one question";
         }
@@ -109,14 +107,13 @@ public class AdminController {
 
     private String validateQuestion(Question question, int position) {
         if (question == null) return "Question " + position + " is missing";
-        if (isBlank(question.getText())) return "Question " + position + " must have text";
 
         List<Option> options = question.getOptions();
         if (options == null || options.size() < 2) {
             return "Question " + position + " must have at least two options";
         }
-        if (options.stream().anyMatch(o -> o == null || isBlank(o.getText()))) {
-            return "Question " + position + " has an option with no text";
+        if (options.stream().anyMatch(o -> o == null)) {
+            return "Question " + position + " has an empty option entry";
         }
 
         long correctCount = options.stream().filter(Option::isCorrect).count();
@@ -124,10 +121,6 @@ public class AdminController {
             return "Question " + position + " must have exactly one correct option (found " + correctCount + ")";
         }
         return null;
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
     }
 
     private ResponseEntity<Map<String, String>> badRequest(String message) {

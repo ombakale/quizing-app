@@ -1,6 +1,7 @@
 package com.quizapp.controller;
 
 import com.quizapp.dto.AuthRequest;
+import jakarta.validation.Valid;
 import com.quizapp.dto.AuthResponse;
 import com.quizapp.entity.User;
 import com.quizapp.repository.UserRepository;
@@ -37,7 +38,7 @@ public class AuthController {
 
     @PostMapping("/register")
     @Operation(summary = "Register a new user, or an admin when a valid adminCode is supplied")
-    public ResponseEntity<?> register(@RequestBody AuthRequest request) {
+    public ResponseEntity<?> register(@Valid @RequestBody AuthRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", "Username is already taken"));
         }

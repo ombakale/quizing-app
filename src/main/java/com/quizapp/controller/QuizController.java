@@ -1,6 +1,7 @@
 package com.quizapp.controller;
 
 import com.quizapp.dto.QuizResultResponse;
+import jakarta.validation.Valid;
 import com.quizapp.dto.QuizSummaryResponse;
 import com.quizapp.dto.QuizSubmitRequest;
 import com.quizapp.entity.*;
@@ -84,7 +85,7 @@ public class QuizController {
     public ResponseEntity<?> submitQuiz(
             @PathVariable Long id,
             Authentication auth,
-            @RequestBody QuizSubmitRequest request) {
+            @Valid @RequestBody QuizSubmitRequest request) {
 
         Quiz quiz = quizRepository.findById(id).orElse(null);
         if (quiz == null) return ResponseEntity.notFound().build();
@@ -105,10 +106,6 @@ public class QuizController {
         if (request.getAnswers() != null) {
             for (QuizSubmitRequest.AnswerItem item : request.getAnswers()) {
                 Long questionId = item.getQuestionId();
-                if (questionId == null) {
-                    return badRequest("Each answer must include a questionId");
-                }
-
                 Question question = questionsById.get(questionId);
                 if (question == null) {
                     return badRequest("Question " + questionId + " does not belong to quiz " + id);
