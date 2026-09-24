@@ -490,6 +490,24 @@ code, kbd, pre, samp { font-family: var(--font-mono); font-size: 0.9em; }
 }
 
 /* ==========================================================================
+   Border-box sizing.
+
+   The design system never sets this, and browsers default to `content-box`,
+   where `width` and `height` describe the content only - padding and border are
+   added on top. `.input`, `.select` and `.textarea` are all
+   `width: 100%; padding: 0 0.875rem; border: 1px solid`, so each one rendered
+   30px wider than the card holding it and hung over the right edge. The same
+   arithmetic inflated every `min-height` control: an option row asked for 44px
+   and painted 78px.
+
+   Declaring it once here fixes the whole app rather than patching each control.
+   Sizes that were already explicit are unaffected in any way that shows: a
+   button keeps its 44px height, because its vertical padding is zero.
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ==========================================================================
    App-local additions.
 
    Everything above this line is the design system verbatim. This block holds
