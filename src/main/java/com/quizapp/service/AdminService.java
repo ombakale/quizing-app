@@ -5,35 +5,64 @@ import com.quizapp.dto.request.QuizRequest;
 import com.quizapp.dto.request.QuizUpdateRequest;
 import com.quizapp.dto.response.QuestionResponse;
 import com.quizapp.dto.response.QuizResponse;
+import com.quizapp.dto.response.UserResponse;
 import com.quizapp.entity.Option;
 import com.quizapp.entity.Question;
 import com.quizapp.entity.Quiz;
+import com.quizapp.entity.User;
 import com.quizapp.mapper.QuizMapper;
 import com.quizapp.exception.BadRequestException;
 import com.quizapp.exception.ResourceNotFoundException;
 import com.quizapp.repository.QuestionRepository;
 import com.quizapp.repository.QuizAttemptRepository;
 import com.quizapp.repository.QuizRepository;
+import com.quizapp.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
-/** Quiz authoring: create, update and delete quizzes and their questions. */
+/** Admin surface: quiz authoring, plus the small amount of user administration the UI needs. */
 @Service
 public class AdminService {
 
     private final QuizRepository quizRepository;
     private final QuestionRepository questionRepository;
     private final QuizAttemptRepository quizAttemptRepository;
+    private final UserRepository userRepository;
 
     public AdminService(QuizRepository quizRepository,
                         QuestionRepository questionRepository,
-                        QuizAttemptRepository quizAttemptRepository) {
+                        QuizAttemptRepository quizAttemptRepository,
+                        UserRepository userRepository) {
         this.quizRepository = quizRepository;
         this.questionRepository = questionRepository;
         this.quizAttemptRepository = quizAttemptRepository;
+        this.userRepository = userRepository;
     }
+
+    // ------------------------------------------------------------------ quizzes, reading
+
+    /**
+     * The admin view of every quiz, answer key included. Students get
+     * {@code GET /api/quizzes}, whose response type has no {@code correct} field at all.
+     */
+    @Transactional(readOnly = true)
+    public List<QuizResponse> listQuizzes() {
+        return quizRepository.findAll().stream()
+                .sorted(Comparator.comparing(Quiz::getId))
+                .map(QuizMapper::toResponse)
+                .toList();
+    }
+
+    /** One quiz with its answer key - what the edit screen loads. */
+    @Transactional(readOnly = true)
+    public QuizResponse getQuiz(Long quizId) {
+        return QuizMapper.toResponse(requireQuiz(quizId));
+    }
+
+    // ------------------------------------------------------------------ quizzes, writing
 
     @Transactional
     public QuizResponse createQuiz(QuizRequest request) {
@@ -103,6 +132,45 @@ public class AdminService {
             throw new ResourceNotFoundException("Question", questionId);
         }
         questionRepository.deleteById(questionId);
+    }
+
+    // ------------------------------------------------------------------ users
+
+    @Transactional(readOnly = true)
+    public List<UserResponse> listUsers() {
+        return userRepository.findAllByOrderByIdAsc().stream()
+                .map(user -> UserResponse.builder()
+                        .id(user.getId())
+                        .username(user.getUsername())
+                        .role(user.getRole())
+                        .attemptCount(quizAttemptRepository.countByUserId(user.getId()))
+                        .build())
+                .toList();
+    }
+
+    /**
+     * Removes an account and the attempt history that belongs to it.
+     *
+     * <p>Attempts are deleted rather than detached, the opposite of
+     * {@link #deleteQuiz(Long)}: a quiz's history is a record of what students did and
+     * outlives the quiz, whereas a person's attempts are that person's and should leave
+     * with them.
+     *
+     * @param requestedBy the admin making the call, who may not delete their own account -
+     *                    doing so would invalidate the token mid-request and, if they were
+     *                    the last admin, leave nobody able to author anything.
+     */
+    @Transactional
+    public void deleteUser(Long userId, String requestedBy) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        if (user.getUsername().equals(requestedBy)) {
+            throw new BadRequestException("You cannot delete your own account");
+        }
+
+        quizAttemptRepository.deleteByUserId(userId);
+        userRepository.delete(user);
     }
 
     // ------------------------------------------------------------------ internals

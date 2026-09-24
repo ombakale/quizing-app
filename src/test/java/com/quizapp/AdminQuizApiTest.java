@@ -246,4 +246,54 @@ class AdminQuizApiTest extends ApiTestBase {
         mockMvc.perform(get("/api/quizzes/" + quizId).header("Authorization", bearer(adminToken)))
                 .andExpect(jsonPath("$.questions.length()").value(1));
     }
+
+    // ------------------------------------------------------------------ reading
+
+    @Test
+    @DisplayName("the admin quiz list includes the answer key")
+    void adminListShowsAnswerKey() throws Exception {
+        createQuiz(adminToken, twoQuestionQuiz("Readable"));
+
+        mockMvc.perform(get("/api/admin/quizzes").header("Authorization", bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].title").value("Readable"))
+                // The edit screen cannot show which option is right without this.
+                .andExpect(jsonPath("$[0].questions[0].options[0].correct").value(true))
+                .andExpect(jsonPath("$[0].questions[0].options[1].correct").value(false));
+    }
+
+    @Test
+    @DisplayName("an admin can read one quiz with its answer key")
+    void adminReadsSingleQuiz() throws Exception {
+        long quizId = createQuiz(adminToken, twoQuestionQuiz("One")).get("id").asLong();
+
+        mockMvc.perform(get("/api/admin/quizzes/" + quizId)
+                        .header("Authorization", bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(quizId))
+                .andExpect(jsonPath("$.questions.length()").value(2))
+                .andExpect(jsonPath("$.questions[0].options[0].correct").value(true));
+    }
+
+    @Test
+    @DisplayName("reading a quiz that is not there is a 404")
+    void adminReadMissingQuiz() throws Exception {
+        mockMvc.perform(get("/api/admin/quizzes/9999")
+                        .header("Authorization", bearer(adminToken)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("a student cannot reach the admin read endpoints")
+    void studentCannotReadAnswerKey() throws Exception {
+        long quizId = createQuiz(adminToken, twoQuestionQuiz("Secret")).get("id").asLong();
+        String studentToken = registerStudent("alice");
+
+        mockMvc.perform(get("/api/admin/quizzes").header("Authorization", bearer(studentToken)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/admin/quizzes/" + quizId)
+                        .header("Authorization", bearer(studentToken)))
+                .andExpect(status().isForbidden());
+    }
 }
