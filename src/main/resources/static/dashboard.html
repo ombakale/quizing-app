@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Available Quizzes — Quiz Application</title>
+<meta name="theme-color" content="#0d6efd">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.svg">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="page">
+<div id="nav"></div>
+<main class="kit-main">
+  <div class="kit-head">
+    <div>
+      <h1>Available Quizzes</h1>
+      <p id="dash-sub">Pick a quiz to begin. Your score is calculated the moment you submit.</p>
+    </div>
+    <div class="actions" id="dash-actions"></div>
+  </div>
+
+  <div id="load-error" class="alert alert-danger" role="alert" hidden style="margin-bottom:var(--space-4)"></div>
+
+  <div id="quiz-list" class="quiz-grid"></div>
+
+  <section id="attempts" style="margin-top:var(--space-6)" hidden>
+    <h2 class="section-heading">Your attempts</h2>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse;font-size:var(--text-sm)">
+        <thead><tr>
+          <th class="attempts-th">Quiz</th>
+          <th class="attempts-th">Score</th>
+          <th class="attempts-th">Result</th>
+          <th class="attempts-th">Taken</th>
+        </tr></thead>
+        <tbody id="attempts-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+<script src="/components/navbar.js"></script>
+<script src="/components/quiz-card.js"></script>
+<script src="/components/form-field.js"></script>
+<script src="/components/feedback.js"></script>
+<script>
+  renderNavbar(document.getElementById('nav'));
+
+  if (requireSession()) {
+    const current = session.get();
+    const isAdmin = current.role === 'ADMIN';
+    const list = document.getElementById('quiz-list');
+    const errorBox = document.getElementById('load-error');
+
+    // ADMIN gets the authoring entry points. Green is the authoring action; managing
+    // accounts is ordinary navigation, so it stays an outline button.
+    if (isAdmin) {
+      document.getElementById('dash-actions').append(
+        el('a', { class: 'btn btn-outline', href: 'admin-users.html', text: 'Manage Users' }),
+        el('a', { class: 'btn btn-authoring', href: 'admin-quiz-builder.html', text: 'Create Quiz' }));
+      document.getElementById('dash-sub').textContent =
+        'Author quizzes, or take one yourself to check how it reads.';
+    }
+
+    function startQuiz(id) {
+      handoff.startAttempt(id);
+      location.href = 'quiz.html';
+    }
+
+    function editQuiz(id) {
+      location.href = 'admin-quiz-builder.html?id=' + id;
+    }
+
+    async function deleteQuiz(id, { restore }) {
+      try {
+        await Api.deleteQuiz(id);
+        toast('Quiz deleted');
+        await loadQuizzes();
+      } catch (err) {
+        // Put the buttons back so the row is not left stuck mid-confirmation.
+        restore();
+        showFormError(errorBox, err.message);
+      }
+    }
+
+    async function loadQuizzes() {
+      list.textContent = '';
+      try {
+        const quizzes = await Api.quizzes();
+        clearFormError(errorBox);
+        if (!quizzes.length) {
+          list.append(EmptyState({
+            message: 'No quizzes available yet.',
+            actionLabel: 'Create the first quiz',
+            actionHref: isAdmin ? 'admin-quiz-builder.html' : null,
+            note: 'An admin needs to create one first.'
+          }));
+          return;
+        }
+        for (const quiz of quizzes) {
+          list.append(QuizCard({
+            quiz,
+            onStart: startQuiz,
+            // Only an admin gets these, and the server enforces the same rule: a
+            // student calling the endpoint directly is refused with a 403.
+            onEdit: isAdmin ? editQuiz : null,
+            onDelete: isAdmin ? deleteQuiz : null
+          }));
+        }
+      } catch (err) {
+        showFormError(errorBox, err.message);
+      }
+    }
+
+    async function loadAttempts() {
+      let attempts;
+      try {
+        attempts = await Api.attempts();
+      } catch (err) {
+        // The quiz list is the point of this screen; a missing history is not
+        // worth an alert of its own, so it is reported quietly and once.
+        console.warn('Could not load attempt history:', err.message);
+        return;
+      }
+      if (!attempts.length) return;
+
+      document.getElementById('attempts').hidden = false;
+      const body = document.getElementById('attempts-body');
+      for (const a of attempts.slice().reverse()) {
+        const pct = Math.round(a.percentage);
+        body.append(el('tr', {}, [
+          el('td', { class: 'attempts-td', text: a.quizTitle }),
+          el('td', { class: 'attempts-td attempts-num', text: a.score + ' / ' + a.totalQuestions }),
+          el('td', { class: 'attempts-td' },
+            el('span', { class: 'badge ' + (pct >= 50 ? 'badge-admin' : 'badge-student'), text: pct + '%' })),
+          el('td', { class: 'attempts-td', text: new Date(a.attemptedAt).toLocaleString() })
+        ]));
+      }
+    }
+
+    loadQuizzes();
+    loadAttempts();
+  }
+</script>
+</body>
+</html>

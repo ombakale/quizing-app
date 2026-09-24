@@ -1,0 +1,12 @@
+-- Runs after Hibernate has created or updated the schema (see application-prod.yml:
+-- spring.jpa.defer-datasource-initialization), against Postgres only.
+--
+-- The service already refuses a username that differs from an existing one only by case,
+-- but that check and the insert are two statements: two registrations racing each other
+-- can both pass it. The column's own unique constraint is case-sensitive, so it lets
+-- "Admin-om" and "admin-om" through - and a case-insensitive login lookup that then finds
+-- two rows fails with a 500. This index makes the database itself refuse the second one;
+-- the resulting constraint violation is already mapped to a 409.
+--
+-- Hibernate cannot declare an index on an expression, which is why it lives here.
+CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_key ON users (lower(username));

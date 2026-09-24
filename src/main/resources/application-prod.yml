@@ -1,7 +1,49 @@
 # Production profile - activate with SPRING_PROFILES_ACTIVE=prod (e.g. on Cloud Run).
-# JWT_SECRET and ADMIN_REGISTRATION_CODE have no defaults here, so the app fails fast
-# at startup instead of running on well-known development values.
+#
+# JWT_SECRET, ADMIN_REGISTRATION_CODE and the datasource credentials have no defaults
+# here, so the app fails fast at startup instead of running on well-known development
+# values or silently falling back to a throwaway in-memory database.
+
 spring:
+  datasource:
+    # Postgres, so a registration survives a restart. The dev profile's in-memory H2
+    # was wiped on every Cloud Run cold start, which looked like "login is broken
+    # after registering" and like duplicate usernames being allowed.
+    #
+    # Use the Supabase *pooler* host, not db.<ref>.supabase.co: the direct host
+    # resolves to IPv6 only and Cloud Run egress is IPv4, so it cannot be reached.
+    # Port 5432 is the pooler's session mode, which supports the prepared statements
+    # Hibernate relies on; port 6543 (transaction mode) does not.
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # Small on purpose: the pooler counts every connection against the project's
+      # limit, and several Cloud Run instances share that budget.
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: 1
+      # Cloud Run freezes an idle instance, so a long-lived connection is often dead
+      # by the time it is used again. Recycle well inside the pooler's own timeout.
+      max-lifetime: 300000
+      idle-timeout: 120000
+      connection-timeout: 15000
+      initialization-fail-timeout: -1
+
+  jpa:
+    hibernate:
+      # The entities own the schema in this project; there is no migration tool.
+      ddl-auto: update
+    open-in-view: false
+    # Run schema-postgresql.sql *after* Hibernate, so on a fresh database the users table
+    # exists by the time the case-insensitive unique index is created on it.
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
+      platform: postgresql
+
   h2:
     console:
       enabled: false

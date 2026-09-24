@@ -23,4 +23,14 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> 
     @Modifying
     @Query("update QuizAttempt a set a.quiz = null where a.quiz.id = :quizId")
     int detachFromQuiz(@Param("quizId") Long quizId);
+
+    long countByUserId(Long userId);
+
+    /**
+     * Attempts belong to the person who made them, so they go when the account goes -
+     * unlike the quiz case above, where the history is what survives.
+     */
+    @Modifying
+    @Query("delete from QuizAttempt a where a.user.id = :userId")
+    int deleteByUserId(@Param("userId") Long userId);
 }

@@ -1,0 +1,13 @@
+{
+  "name": "Quiz Application",
+  "short_name": "Quiz",
+  "description": "Take quizzes, submit answers and see your score instantly.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#0d6efd",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/apple-touch-icon.svg", "sizes": "180x180", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

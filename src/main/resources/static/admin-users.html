@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage users — Quiz Application</title>
+<meta name="theme-color" content="#0d6efd">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.svg">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="page">
+<div id="nav"></div>
+<main class="kit-main">
+  <div class="kit-head">
+    <div>
+      <h1>Manage Users</h1>
+      <p>Every account, and how many quizzes each one has submitted.</p>
+    </div>
+    <div class="actions">
+      <a class="btn btn-outline" href="dashboard.html">Back to Quizzes</a>
+    </div>
+  </div>
+
+  <div id="load-error" class="alert alert-danger" role="alert" hidden style="margin-bottom:var(--space-4)"></div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:var(--text-sm)">
+      <thead><tr>
+        <th class="attempts-th">Username</th>
+        <th class="attempts-th">Role</th>
+        <th class="attempts-th">Attempts</th>
+        <th class="attempts-th" style="text-align:right">&nbsp;</th>
+      </tr></thead>
+      <tbody id="users-body"></tbody>
+    </table>
+  </div>
+
+  <p class="help" style="margin-top:var(--space-3)">
+    Deleting an account also removes its attempt history. Quizzes it authored stay.
+  </p>
+</main>
+
+<script src="/app.js"></script>
+<script src="/components/navbar.js"></script>
+<script src="/components/form-field.js"></script>
+<script src="/components/feedback.js"></script>
+<script>
+  renderNavbar(document.getElementById('nav'));
+
+  // ADMIN only. The server refuses these endpoints for anyone else with a 403,
+  // so this redirect is a courtesy rather than the control.
+  if (requireSession('ADMIN')) {
+    const me = session.get().username;
+    const body = document.getElementById('users-body');
+    const errorBox = document.getElementById('load-error');
+
+    async function remove(user, actions, restore) {
+      try {
+        await Api.deleteUser(user.id);
+        toast('Deleted ' + user.username);
+        await load();
+      } catch (err) {
+        // Put the buttons back rather than leaving the row mid-confirmation.
+        restore();
+        showFormError(errorBox, err.message);
+      }
+    }
+
+    function row(user) {
+      const isMe = user.username === me;
+      const actions = el('div', { class: 'actions actions-end', style: 'gap:var(--space-2)' });
+
+      if (isMe) {
+        // The server rejects this too: deleting your own account would invalidate the
+        // token mid-request and could leave nobody able to author.
+        actions.append(el('span', { class: 'help', style: 'margin:0', text: 'Signed in as you' }));
+      } else {
+        actions.append(el('button', {
+          class: 'btn btn-ghost btn-sm', type: 'button', text: 'Delete',
+          onclick: () => inlineConfirm(actions, {
+            message: 'Delete ' + user.username + '?',
+            onConfirm: ({ restore }) => remove(user, actions, restore)
+          })
+        }));
+      }
+
+      return el('tr', {}, [
+        el('td', { class: 'attempts-td', text: user.username }),
+        el('td', { class: 'attempts-td' },
+          el('span', { class: 'badge ' + (user.role === 'ADMIN' ? 'badge-admin' : 'badge-student'),
+                       text: roleLabel(user.role) })),
+        el('td', { class: 'attempts-td attempts-num', text: String(user.attemptCount) }),
+        el('td', { class: 'attempts-td' }, actions)
+      ]);
+    }
+
+    async function load() {
+      try {
+        const users = await Api.users();
+        clearFormError(errorBox);
+        body.textContent = '';
+        for (const user of users) body.append(row(user));
+      } catch (err) {
+        showFormError(errorBox, err.message);
+      }
+    }
+
+    load();
+  }
+</script>
+</body>
+</html>
