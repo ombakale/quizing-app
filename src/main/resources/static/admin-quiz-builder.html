@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz builder — Quiz Application</title>
+<meta name="theme-color" content="#0d6efd">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.svg">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="page">
+<div id="nav"></div>
+<main class="kit-main">
+  <div class="kit-prose">
+    <div class="kit-head">
+      <div>
+        <h1 id="builder-heading">Create New Quiz</h1>
+        <p id="builder-sub">Add questions and mark exactly one correct option for each.</p>
+      </div>
+      <span class="badge badge-admin">Admin</span>
+    </div>
+
+    <form id="builder" novalidate>
+      <div id="form-error" class="alert alert-danger" role="alert" hidden style="margin-bottom:var(--space-4)"></div>
+
+      <div class="card" style="margin-bottom:var(--space-4)">
+        <div class="field">
+          <label class="label" for="title">Quiz Title</label>
+          <input class="input" id="title" placeholder="e.g., Java Basics" maxlength="200">
+          <p class="error" id="title-error" hidden></p>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="label" for="description">Description</label>
+          <textarea class="textarea" id="description" rows="2" placeholder="e.g., Test core concepts" maxlength="1000"></textarea>
+          <p class="error" id="description-error" hidden></p>
+        </div>
+      </div>
+
+      <h2 class="section-heading" style="font-size:var(--text-xl)">Questions</h2>
+      <div id="questions"></div>
+
+      <button class="btn btn-outline" type="button" id="add-question">Add question</button>
+
+      <div class="kit-actionbar">
+        <div class="actions actions-end">
+          <a class="btn btn-ghost" href="dashboard.html">Cancel</a>
+          <button class="btn btn-authoring" type="submit" id="create-btn">Create Quiz</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</main>
+
+<script src="/app.js"></script>
+<script src="/components/navbar.js"></script>
+<script src="/components/form-field.js"></script>
+<script src="/components/feedback.js"></script>
+<script src="/components/quiz-composer.js"></script>
+<script>
+  renderNavbar(document.getElementById('nav'));
+
+  // ADMIN only. A student who lands here is sent back to the dashboard, and the
+  // server would refuse the POST with a 403 regardless.
+  if (requireSession('ADMIN')) {
+    const $ = id => document.getElementById(id);
+    const composer = QuizComposer($('questions'));
+
+    // ?id=<quiz> switches this screen from create to edit.
+    const quizId = new URLSearchParams(location.search).get('id');
+    const originalQuestionIds = [];
+
+    const fields = {
+      title:       { input: $('title'),       error: $('title-error') },
+      description: { input: $('description'), error: $('description-error') }
+    };
+    for (const f of Object.values(fields)) {
+      f.input.addEventListener('input', () => setFieldError(f.input, f.error, null));
+    }
+
+    $('add-question').addEventListener('click', () => {
+      composer.addQuestion();
+      composer.focusLast();
+    });
+
+    /* Saving a new quiz is one POST. Saving an edit is a reconciliation, because the
+       API has no "replace the whole quiz" call:
+
+         - the title and description go through PUT /api/admin/quizzes/{id}
+         - a question that already has a server id is a PUT
+         - a question the author added is a POST
+         - a question they removed from the form is a DELETE
+
+       Order matters. Deletes run last, so a failure partway through never leaves the
+       quiz shorter than the author intended. */
+    async function saveNew(title, description, questions) {
+      await Api.createQuiz({ title, description, questions });
+      return 'Quiz created';
+    }
+
+    async function saveEdit(title, description, questions) {
+      await Api.updateQuiz(quizId, { title, description });
+
+      const keptIds = new Set();
+      for (const { serverId, text, options } of questions) {
+        if (serverId) {
+          await Api.updateQuestion(serverId, { text, options });
+          keptIds.add(serverId);
+        } else {
+          await Api.addQuestion(quizId, { text, options });
+        }
+      }
+
+      for (const id of originalQuestionIds) {
+        if (!keptIds.has(id)) await Api.deleteQuestion(id);
+      }
+      return 'Quiz updated';
+    }
+
+    $('builder').addEventListener('submit', async e => {
+      e.preventDefault();
+      const submit = $('create-btn');
+      const title = $('title').value.trim();
+      const description = $('description').value.trim();
+
+      clearFormError($('form-error'));
+
+      let ok = setFieldError(fields.title.input, fields.title.error, Rules.quizTitle(title));
+      ok = setFieldError(fields.description.input, fields.description.error,
+                         Rules.quizDescription(description)) && ok;
+
+      const { ok: questionsOk, questions } = composer.collectForEdit();
+      if (!ok || !questionsOk) {
+        showFormError($('form-error'), 'Validation failed — check the highlighted fields.');
+        return;
+      }
+
+      submit.disabled = true;
+      try {
+        const message = quizId
+          ? await saveEdit(title, description, questions)
+          : await saveNew(title, description,
+                          questions.map(({ text, options }) => ({ text, options })));
+        toast(message);                            // not a blocking alert()
+        setTimeout(() => { location.href = 'dashboard.html'; }, 700);
+      } catch (err) {
+        submit.disabled = false;
+        // Nested validation paths (questions[0].options[1].text) go back to the
+        // input they came from; title and description map straight across.
+        // Anything still unplaced is named in the form-level alert rather than
+        // dropped, so the admin always sees everything the server rejected.
+        if (err.fieldErrors) {
+          const leftover = composer.applyServerErrors(err.fieldErrors)
+            .filter(([path, message]) => {
+              const target = fields[path];
+              if (!target) return true;
+              setFieldError(target.input, target.error, message);
+              return false;
+            })
+            .map(([path, message]) => path + ': ' + message);
+          showFormError($('form-error'), leftover.length
+            ? err.message + ' — ' + leftover.join('; ')
+            : err.message);
+        } else {
+          showFormError($('form-error'), err.message);
+        }
+      }
+    });
+
+    /* Edit mode is the same screen with ?id=<quiz>. It loads the admin view of the
+       quiz, which is the only read that includes the answer key - the student
+       endpoint omits `correct` entirely, so an edit screen cannot be built on it. */
+    async function loadForEdit() {
+      $('builder-heading').textContent = 'Edit Quiz';
+      $('builder-sub').textContent = 'Change the questions, or the title and description.';
+      $('create-btn').textContent = 'Save Changes';
+      document.title = 'Edit quiz — Quiz Application';
+
+      try {
+        const quiz = await Api.adminQuiz(quizId);
+        $('title').value = quiz.title;
+        $('description').value = quiz.description || '';
+
+        composer.clear();
+        for (const question of quiz.questions) {
+          originalQuestionIds.push(question.id);
+          composer.addQuestion(question.text, question.options, question.id);
+        }
+        if (!quiz.questions.length) composer.addQuestion();
+      } catch (err) {
+        showFormError($('form-error'), err.message);
+        $('create-btn').disabled = true;
+      }
+    }
+
+    if (quizId) {
+      loadForEdit();
+    } else {
+      // Start with one question and two options — the smallest shape the API accepts.
+      composer.addQuestion();
+    }
+  }
+</script>
+</body>
+</html>

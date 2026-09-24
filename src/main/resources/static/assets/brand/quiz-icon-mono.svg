@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Quiz Application">
+  <title>Quiz Application</title>
+  <!-- Monochrome variant for tray icons, dark navbars and print. Inherits currentColor. -->
+  <g fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 389.9 232.4 A 136 136 0 1 1 302.5 128.2"/>
+    <path d="M 176 258 L 234 316 L 372 150"/>
+  </g>
+</svg>

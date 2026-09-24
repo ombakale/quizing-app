@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your result — Quiz Application</title>
+<meta name="theme-color" content="#0d6efd">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.svg">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="page">
+<div id="nav"></div>
+<main class="kit-main">
+  <div class="kit-prose">
+    <div class="card" style="text-align:center">
+      <p style="font-family:var(--font-body);font-size:var(--text-xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--fg-muted);margin:0 0 var(--space-1)">Quiz completed</p>
+      <h1 id="result-title" style="font-size:var(--text-2xl);margin:0 0 var(--space-3)"></h1>
+      <div class="score-display" id="result-score" aria-describedby="result-pct">0 / 0</div>
+      <p id="result-pct" style="font-size:var(--text-xl);color:var(--score-fg);font-weight:var(--weight-semibold);margin:var(--space-2) 0 0"></p>
+      <p id="result-note" class="help" style="margin-top:var(--space-2)"></p>
+    </div>
+
+    <h2 class="section-heading" style="margin-top:var(--space-5)">Review</h2>
+    <p class="help" style="margin:0 0 var(--space-3)">Correct answers are only revealed after submission — the API withholds them until then.</p>
+    <div id="review"></div>
+
+    <div class="actions actions-end" style="margin-top:var(--space-5)">
+      <button class="btn btn-ghost" type="button" id="retry-btn">Retake quiz</button>
+      <button class="btn btn-primary" type="button" id="back-btn">Back to Quizzes</button>
+    </div>
+  </div>
+</main>
+
+<script src="/app.js"></script>
+<script src="/components/navbar.js"></script>
+<script src="/components/option-row.js"></script>
+<script src="/components/feedback.js"></script>
+<script>
+  renderNavbar(document.getElementById('nav'));
+
+  if (requireSession()) {
+    const stored = handoff.getResult();
+    if (!stored) {
+      location.replace('dashboard.html');
+    } else {
+      const r = stored.result;          // QuizResultResponse
+      const quiz = stored.quiz;         // StudentQuizResponse — no `correct` field
+
+      document.getElementById('result-title').textContent = r.quizTitle;
+      document.getElementById('result-pct').textContent = 'Score: ' + Math.round(r.percentage) + '%';
+      document.getElementById('result-note').textContent =
+        r.score === r.totalQuestions
+          ? 'Every question correct.'
+          : r.score + ' of ' + r.totalQuestions + ' correct.';
+
+      // Count-up: the one expressive motion, once. Respects reduced-motion.
+      const scoreEl = document.getElementById('result-score');
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) {
+        scoreEl.textContent = r.score + ' / ' + r.totalQuestions;
+      } else {
+        const t0 = performance.now(), dur = 320;
+        (function step(now) {
+          const p = Math.min(1, (now - t0) / dur);
+          scoreEl.textContent = Math.round(r.score * p) + ' / ' + r.totalQuestions;
+          if (p < 1) requestAnimationFrame(step);
+        })(t0);
+      }
+
+      /* Per-question review, driven entirely by QuizResultResponse.details.
+         details carries correctOptionId but no option text, and the quiz payload
+         carries option text but no correctness — the review is the join of the
+         two, and it can only exist after submitting. */
+      const review = document.getElementById('review');
+      r.details.forEach((d, i) => {
+        const q = quiz.questions.find(x => x.id === d.questionId);
+        const card = el('div', { class: 'card question' });
+        card.append(el('p', { class: 'question-stem' }, [
+          el('span', { class: 'question-index', text: 'Q' + (i + 1) + '. ' }),
+          el('span', { text: d.questionText })
+        ]));
+
+        if (!q) {
+          // The quiz changed under us; the verdict is still honest without the options.
+          card.append(el('p', { class: 'help', text: d.correct ? 'Correct.' : 'Not correct.' }));
+        } else {
+          for (const option of q.options) {
+            const row = ReviewOptionRow({
+              option,
+              selectedOptionId: d.selectedOptionId,
+              correctOptionId: d.correctOptionId
+            });
+            if (row) card.append(row);      // null = unchosen and incorrect
+          }
+        }
+        review.append(card);
+      });
+
+      document.getElementById('back-btn').addEventListener('click', () => {
+        handoff.clear();
+        location.href = 'dashboard.html';
+      });
+      document.getElementById('retry-btn').addEventListener('click', () => {
+        handoff.clear();
+        handoff.startAttempt(r.quizId);
+        location.href = 'quiz.html';
+      });
+    }
+  }
+</script>
+</body>
+</html>

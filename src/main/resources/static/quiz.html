@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taking a quiz — Quiz Application</title>
+<meta name="theme-color" content="#0d6efd">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.svg">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="page">
+<div id="nav"></div>
+<main class="kit-main">
+  <div class="kit-prose">
+    <div class="kit-head">
+      <div>
+        <h1 id="quiz-title">Loading…</h1>
+        <p id="quiz-desc"></p>
+      </div>
+    </div>
+
+    <div id="load-error" class="alert alert-danger" role="alert" hidden style="margin-bottom:var(--space-4)"></div>
+
+    <div style="margin-bottom:var(--space-4)">
+      <div class="progress-meta">
+        <span id="progress-label">0 of 0 answered</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress" role="progressbar" aria-labelledby="progress-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div id="unanswered" class="alert alert-danger" role="alert" hidden style="margin-bottom:var(--space-4)"></div>
+
+    <form id="quiz-form" novalidate>
+      <div id="questions"></div>
+
+      <div class="kit-actionbar" id="actionbar" hidden>
+        <div class="actions actions-end">
+          <button class="btn btn-ghost" type="button" id="cancel-btn">Cancel</button>
+          <button class="btn btn-authoring" type="submit" id="submit-btn">Submit Quiz</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</main>
+
+<script src="/app.js"></script>
+<script src="/components/navbar.js"></script>
+<script src="/components/option-row.js"></script>
+<script src="/components/form-field.js"></script>
+<script src="/components/feedback.js"></script>
+<script>
+  renderNavbar(document.getElementById('nav'));
+
+  if (requireSession()) {
+    const attempt = handoff.getAttempt();
+    if (!attempt) {
+      location.replace('dashboard.html');
+    } else {
+      const answers = attempt.answers || {};      // questionId -> optionId
+      const wrap = document.getElementById('questions');
+      const errorBox = document.getElementById('load-error');
+      let quiz = null;
+
+      function leave() {
+        handoff.clear();
+        location.href = 'dashboard.html';
+      }
+      document.getElementById('cancel-btn').addEventListener('click', leave);
+
+      function refreshProgress() {
+        updateProgress({
+          answered: quiz.questions.filter(q => answers[q.id] != null).length,
+          total: quiz.questions.length
+        });
+      }
+
+      /* The payload here is StudentQuizResponse: its option type has no
+         `correct` field at all, so there is nothing to hide client-side. */
+      function render() {
+        document.getElementById('quiz-title').textContent = quiz.title;
+        document.getElementById('quiz-desc').textContent = quiz.description || '';
+        document.getElementById('actionbar').hidden = false;
+
+        quiz.questions.forEach((q, i) => {
+          const fieldset = el('fieldset', { class: 'card question',
+            style: 'border:1px solid var(--border);margin:0 0 var(--space-4)',
+            'data-question-id': q.id });
+
+          // float+width keeps the legend a full-width block, which it is not by default
+          fieldset.append(el('legend', { class: 'question-stem', style: 'padding:0;float:left;width:100%' }, [
+            el('span', { class: 'question-index', text: 'Q' + (i + 1) + '. ' }),
+            el('span', { text: q.text })
+          ]));
+
+          for (const option of q.options) {
+            fieldset.append(OptionRow({
+              option,
+              name: 'q_' + q.id,
+              checked: answers[q.id] === option.id,
+              onSelect: optionId => {
+                answers[q.id] = optionId;
+                handoff.saveAnswers(answers);
+                refreshProgress();
+                document.getElementById('unanswered').hidden = true;
+              }
+            }));
+          }
+          wrap.append(fieldset);
+        });
+
+        refreshProgress();
+      }
+
+      document.getElementById('quiz-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        if (!quiz) return;
+        const submit = document.getElementById('submit-btn');
+
+        const missing = quiz.questions.filter(q => answers[q.id] == null);
+        if (missing.length) {
+          const box = document.getElementById('unanswered');
+          box.innerHTML = ICON.alert;
+          box.append(el('div', { text: missing.length === 1
+            ? '1 question is still unanswered.'
+            : missing.length + ' questions are still unanswered.' }));
+          box.hidden = false;
+          // Move focus to the first gap. No scrollIntoView: focusing scrolls anyway.
+          document.querySelector('[data-question-id="' + missing[0].id + '"] input').focus();
+          return;
+        }
+
+        submit.disabled = true;
+        try {
+          const payload = quiz.questions.map(q => ({ questionId: q.id, selectedOptionId: answers[q.id] }));
+          const result = await Api.submit(quiz.id, payload);
+          // The quiz rides along only so the review can show option text.
+          handoff.setResult(result, quiz);
+          location.href = 'result.html';
+        } catch (err) {
+          showFormError(errorBox, err.message);
+          submit.disabled = false;
+        }
+      });
+
+      (async () => {
+        try {
+          quiz = await Api.quiz(attempt.quizId);
+          render();
+        } catch (err) {
+          document.getElementById('quiz-title').textContent = 'Quiz unavailable';
+          showFormError(errorBox, err.message);
+          errorBox.append(el('a', { class: 'btn btn-outline btn-sm', href: 'dashboard.html',
+                                    text: 'Back to Quizzes', style: 'margin-left:auto' }));
+        }
+      })();
+    }
+  }
+</script>
+</body>
+</html>
