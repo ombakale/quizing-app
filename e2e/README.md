@@ -1,6 +1,6 @@
 # Frontend end-to-end checks
 
-77 checks that drive a real headless browser through the six screens and assert
+79 checks that drive a real headless browser through the six screens and assert
 what the DOM actually renders — including the things a unit test cannot see.
 
 ```bash
