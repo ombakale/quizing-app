@@ -2,6 +2,22 @@ server:
   # Cloud Run injects PORT; 8080 keeps local runs unchanged
   port: ${PORT:8080}
 
+  # Cloud Run terminates TLS at its front end and forwards to the container over plain
+  # HTTP, so without this Spring believes the request scheme is http. Springdoc then
+  # publishes "http://<host>" as the OpenAPI server URL, and Swagger UI - which was
+  # loaded over https - fires Try-it-out calls at a different origin. The browser
+  # reports that as a CORS/mixed-content failure. Honouring X-Forwarded-Proto fixes the
+  # generated URL at the source.
+  #
+  # Safe here because every request reaches the container through Google's front end,
+  # which sets these headers itself; do not enable this where the app is directly
+  # reachable and a client could forge them.
+  forward-headers-strategy: framework
+
+# Default profile: local development and the test suite, on in-memory H2.
+# The deployed app runs with SPRING_PROFILES_ACTIVE=prod, which replaces this
+# datasource with Postgres - see application-prod.yml.
+
 spring:
   application:
     name: quiz-api
@@ -19,6 +35,9 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
+    # Off by default in Spring Boot's own warning for a reason: leaving the session
+    # open through view rendering lets lazy loads fire outside the service layer.
+    open-in-view: false
 
 app:
   admin:
