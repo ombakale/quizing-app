@@ -35,6 +35,14 @@ spring:
       # The entities own the schema in this project; there is no migration tool.
       ddl-auto: update
     open-in-view: false
+    # Run schema-postgresql.sql *after* Hibernate, so on a fresh database the users table
+    # exists by the time the case-insensitive unique index is created on it.
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
+      platform: postgresql
 
   h2:
     console:

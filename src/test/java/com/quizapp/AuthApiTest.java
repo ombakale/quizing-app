@@ -136,4 +136,66 @@ class AuthApiTest extends ApiTestBase {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Malformed JSON request body"));
     }
+
+    // ------------------------------------------------------------------ username casing
+
+    /*
+     * Reported as "I create an account and next time it does not recognise me". Usernames were
+     * matched case-sensitively, so logging back in as "admin-om" after registering "Admin-om"
+     * failed with "Invalid username or password" - and registering again in the other casing
+     * quietly made a second, empty account.
+     */
+
+    @Test
+    @DisplayName("login ignores the capitalisation of the username")
+    void loginIsCaseInsensitive() throws Exception {
+        mockMvc.perform(json(post("/api/auth/register"),
+                        Map.of("username", "Admin-om", "password", "password123")))
+                .andExpect(status().isCreated());
+
+        for (String typed : new String[] {"admin-om", "ADMIN-OM", "aDmIn-Om"}) {
+            mockMvc.perform(json(post("/api/auth/login"),
+                            Map.of("username", typed, "password", "password123")))
+                    .andExpect(status().isOk())
+                    // The account keeps the casing its owner chose, whatever was typed at login.
+                    .andExpect(jsonPath("$.username").value("Admin-om"));
+        }
+    }
+
+    @Test
+    @DisplayName("login ignores whitespace around the username")
+    void loginTrimsUsername() throws Exception {
+        mockMvc.perform(json(post("/api/auth/register"),
+                        Map.of("username", "spacey", "password", "password123")))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(json(post("/api/auth/login"),
+                        Map.of("username", "  spacey ", "password", "password123")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("a username that differs only by case is already taken")
+    void duplicateUsernameIgnoresCase() throws Exception {
+        mockMvc.perform(json(post("/api/auth/register"),
+                        Map.of("username", "Admin-om", "password", "password123")))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(json(post("/api/auth/register"),
+                        Map.of("username", "admin-om", "password", "different1")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Username 'admin-om' is already taken"));
+    }
+
+    @Test
+    @DisplayName("the password is still case-sensitive")
+    void passwordStaysCaseSensitive() throws Exception {
+        mockMvc.perform(json(post("/api/auth/register"),
+                        Map.of("username", "casey", "password", "Password123")))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(json(post("/api/auth/login"),
+                        Map.of("username", "casey", "password", "password123")))
+                .andExpect(status().isUnauthorized());
+    }
 }

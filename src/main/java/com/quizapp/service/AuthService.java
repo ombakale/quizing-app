@@ -38,7 +38,9 @@ public class AuthService {
     }
 
     public AuthResponse register(AuthRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
+        // Case-insensitive, so "admin-om" cannot be registered next to "Admin-om". The name is
+        // stored as typed, so it still displays the way its owner chose.
+        if (userRepository.existsByUsernameIgnoreCase(request.getUsername())) {
             throw new DuplicateResourceException("Username '" + request.getUsername() + "' is already taken");
         }
 
@@ -71,7 +73,9 @@ public class AuthService {
             throw new UnauthorizedException("Invalid username or password");
         }
 
-        User user = userRepository.findByUsername(request.getUsername())
+        // Trimmed and case-insensitive: the frontend already trims, but Swagger and other API
+        // clients send exactly what was typed, and a stray space should not read as a wrong password.
+        User user = userRepository.findByUsernameIgnoreCase(request.getUsername().trim())
                 .orElseThrow(() -> new UnauthorizedException("Invalid username or password"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
